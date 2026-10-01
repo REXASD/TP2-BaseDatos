@@ -18,12 +18,20 @@
         |
         Saldo: {{ cuenta.Saldo }}
 
+        <a href="{{ url_for('estados_cuenta', id_cuenta=cuenta.IdCuenta) }}">
+            Estados de cuenta
+        </a>
+
         <a href="{{ url_for('beneficiarios', id_cuenta=cuenta.IdCuenta) }}">
             Ver beneficiarios
         </a>
     </p>
 
-{% endfor %}
+    {% endfor %}
+
+    <a href="{{ url_for('logout') }}">
+        Cerrar sesión
+    </a>
 
 </body>
 </html>

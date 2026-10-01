@@ -32,6 +32,41 @@
                                 id_beneficiario=beneficiario.IdBeneficiario) }}">
                 Editar
             </a>
+
+            <form
+                method="POST"
+                action="{{ url_for(
+                    'actualizar_porcentaje_beneficiario',
+                    id_cuenta=id_cuenta,
+                    id_beneficiario=beneficiario.IdBeneficiario
+                ) }}"
+                >
+                <input
+                    type="number"
+                    name="porcentaje"
+                    min="0"
+                    max="100"
+                    value="{{ beneficiario.Porcentaje }}"
+                    required
+                >
+
+                <button type="submit">
+                    Cambiar porcentaje
+                </button>
+            </form>
+
+            <form
+                method="POST"
+                action="{{ url_for(
+                    'eliminar_beneficiario',
+                    id_cuenta=id_cuenta,
+                    id_beneficiario=beneficiario.IdBeneficiario
+                ) }}"
+                style="display:inline;"
+                onsubmit="return confirm('¿Está seguro de que desea eliminar este beneficiario?');"
+                >
+                <button type="submit">Eliminar</button>
+            </form>
         </p>
 
     {% endfor %}

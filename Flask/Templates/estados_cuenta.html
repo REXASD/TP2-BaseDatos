@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<body>
+
+<h1>Estados de cuenta</h1>
+
+{% if estados %}
+
+    {% for estado in estados %}
+
+        <p>
+            Desde: {{ estado.FechaInicio }}
+            |
+            Hasta: {{ estado.FechaFin }}
+            |
+            Saldo inicial: {{ estado.SaldoInicial }}
+            |
+            Saldo final: {{ estado.SaldoFinal }}
+            |
+            Intereses: {{ estado.InteresesAcumulados }}
+            |
+            Retiros: {{ estado.CantidadRetiros }}
+            |
+            Depósitos: {{ estado.CantidadDepositos }}
+        </p>
+
+    {% endfor %}
+
+{% else %}
+
+    <p>No hay estados de cuenta disponibles.</p>
+
+{% endif %}
+
+<a href="{{ url_for('inicio') }}">
+    Volver
+</a>
+
+</body>
+</html>

@@ -465,5 +465,240 @@ def editar_beneficiario(id_cuenta, id_beneficiario):
         error=error
     )
 
+@app.route(
+    "/cuenta/<int:id_cuenta>/beneficiarios/<int:id_beneficiario>/eliminar",
+    methods=["POST"]
+)
+def eliminar_beneficiario(id_cuenta, id_beneficiario):
+
+    # Verificar sesión
+    if "id_usuario" not in session:
+        return redirect(url_for("login"))
+
+    # Verificar que el usuario tenga acceso a la cuenta
+    if not usuario_puede_ver_cuenta(
+        session["id_usuario"],
+        id_cuenta
+    ):
+        return "No tiene permiso para acceder a esta cuenta", 403
+
+    conexion = obtener_conexion()
+    cursor = conexion.cursor()
+
+    # Verificar que el beneficiario realmente pertenezca a esa cuenta
+    cursor.execute(
+        """
+        EXEC dbo.sp_ObtenerBeneficiarioPorId
+            @IdBeneficiario=?,
+            @IdCuenta=?;
+        """,
+        id_beneficiario,
+        id_cuenta
+    )
+
+    beneficiario = cursor.fetchone()
+
+    if beneficiario is None:
+        cursor.close()
+        conexion.close()
+        return "Beneficiario no encontrado", 404
+
+    # Eliminar beneficiario
+    cursor.execute(
+        """
+        DECLARE @Resultado INT;
+
+        EXEC @Resultado = dbo.sp_EliminarBeneficiario
+            @IdUsuario=?,
+            @IdBeneficiario=?;
+
+        SELECT @Resultado AS Resultado;
+        """,
+        session["id_usuario"],
+        id_beneficiario
+    )
+
+    resultado = None
+
+    while True:
+        if cursor.description:
+            columnas = [c[0] for c in cursor.description]
+            filas = cursor.fetchall()
+
+            if "Resultado" in columnas and filas:
+                resultado = filas[0][0]
+
+        if not cursor.nextset():
+            break
+
+    conexion.commit()
+
+    cursor.close()
+    conexion.close()
+
+    if resultado == 0:
+        return redirect(
+            url_for(
+                "beneficiarios",
+                id_cuenta=id_cuenta
+            )
+        )
+
+    if resultado == 1:
+        return "El beneficiario no existe o ya está inactivo", 404
+
+    return "Ocurrió un error al eliminar el beneficiario", 500
+
+@app.route(
+    "/cuenta/<int:id_cuenta>/beneficiarios/<int:id_beneficiario>/porcentaje",
+    methods=["POST"]
+)
+def actualizar_porcentaje_beneficiario(id_cuenta, id_beneficiario):
+
+    if "id_usuario" not in session:
+        return redirect(url_for("login"))
+
+    if not usuario_puede_ver_cuenta(
+        session["id_usuario"],
+        id_cuenta
+    ):
+        return "No tiene permiso para acceder a esta cuenta", 403
+
+    porcentaje = request.form["porcentaje"]
+
+    conexion = obtener_conexion()
+    cursor = conexion.cursor()
+
+    # Comprobar que pertenece a esta cuenta
+    cursor.execute(
+        """
+        EXEC dbo.sp_ObtenerBeneficiarioPorId
+            @IdBeneficiario=?,
+            @IdCuenta=?;
+        """,
+        id_beneficiario,
+        id_cuenta
+    )
+
+    if cursor.fetchone() is None:
+        cursor.close()
+        conexion.close()
+        return "Beneficiario no encontrado", 404
+
+    cursor.execute(
+        """
+        DECLARE @Resultado INT;
+
+        EXEC @Resultado = dbo.sp_ActualizarPorcentajeBeneficiario
+            @IdUsuario=?,
+            @IdBeneficiario=?,
+            @Porcentaje=?;
+
+        SELECT @Resultado AS Resultado;
+        """,
+        session["id_usuario"],
+        id_beneficiario,
+        porcentaje
+    )
+
+    resultado = None
+
+    while True:
+        if cursor.description:
+            columnas = [c[0] for c in cursor.description]
+            filas = cursor.fetchall()
+
+            if "Resultado" in columnas and filas:
+                resultado = filas[0][0]
+
+        if not cursor.nextset():
+            break
+
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+
+    if resultado == 0:
+        return redirect(
+            url_for("beneficiarios", id_cuenta=id_cuenta)
+        )
+
+    if resultado == 1:
+        return "El beneficiario no existe o está inactivo", 404
+
+    if resultado == 2:
+        return "El porcentaje debe estar entre 0 y 100", 400
+
+    return "Ocurrió un error al actualizar el porcentaje", 500
+
+@app.route("/cuenta/<int:id_cuenta>/estados")
+def estados_cuenta(id_cuenta):
+
+    if "id_usuario" not in session:
+        return redirect(url_for("login"))
+
+    if not usuario_puede_ver_cuenta(
+        session["id_usuario"],
+        id_cuenta
+    ):
+        return "No tiene permiso para acceder a esta cuenta", 403
+
+    conexion = obtener_conexion()
+    cursor = conexion.cursor()
+
+    cursor.execute(
+        """
+        EXEC dbo.sp_ObtenerEstadosCuenta
+            @IdUsuario=?,
+            @IdCuenta=?;
+        """,
+        session["id_usuario"],
+        id_cuenta
+    )
+
+    columnas = [c[0] for c in cursor.description]
+    filas = cursor.fetchall()
+
+    estados = []
+
+    for fila in filas:
+        estados.append(dict(zip(columnas, fila)))
+
+    conexion.commit()
+
+    cursor.close()
+    conexion.close()
+
+    return render_template(
+        "estados_cuenta.html",
+        estados=estados,
+        id_cuenta=id_cuenta
+    )
+
+@app.route("/logout")
+def logout():
+
+    if "id_usuario" in session:
+
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+
+        cursor.execute(
+            """
+            EXEC dbo.sp_LogoutUsuario
+                @IdUsuario=?;
+            """,
+            session["id_usuario"]
+        )
+
+        conexion.commit()
+
+        cursor.close()
+        conexion.close()
+
+    session.clear()
+
+    return redirect(url_for("login"))
+
 if __name__ == "__main__":
     app.run(debug=True)
