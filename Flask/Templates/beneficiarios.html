@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Beneficiarios</title>
+</head>
+
+<body>
+
+    <h1>Beneficiarios</h1>
+
+    {% if porcentaje_correcto == 0 %}
+        <p>
+            ⚠ Los porcentajes suman {{ total_porcentaje }}%.
+            Deben sumar 100%.
+        </p>
+    {% endif %}
+
+
+    {% for beneficiario in beneficiarios %}
+
+        <p>
+            {{ beneficiario.Nombre }}
+            |
+            {{ beneficiario.Parentezco }}
+            |
+            {{ beneficiario.Porcentaje }}%
+
+            <a href="{{ url_for('editar_beneficiario',
+                                id_cuenta=id_cuenta,
+                                id_beneficiario=beneficiario.IdBeneficiario) }}">
+                Editar
+            </a>
+        </p>
+
+    {% endfor %}
+
+
+    <br>
+
+    <a href="{{ url_for('nuevo_beneficiario', id_cuenta=id_cuenta) }}">
+        Agregar beneficiario
+    </a>
+
+    <br><br>
+
+    <a href="{{ url_for('inicio') }}">
+        Volver
+    </a>
+
+</body>
+
+</html>

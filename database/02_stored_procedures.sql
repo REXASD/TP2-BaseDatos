@@ -708,3 +708,51 @@ BEGIN
     END CATCH
 END;
 GO
+
+-- ============================================================
+-- 13. Obtener tipo de documentos de identidad
+-- ============================================================
+
+
+CREATE OR ALTER   PROCEDURE dbo.sp_ObtenerTiposDocumento
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        Id,
+        Nombre
+    FROM dbo.TipoDocuIdentidad;
+END;
+
+-- ============================================================
+-- 14. Obtener beneficiario por id
+-- ============================================================
+
+CREATE OR ALTER   PROCEDURE [dbo].[sp_ObtenerBeneficiarioPorId]
+    @IdBeneficiario INT,
+    @IdCuenta INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        Beneficiario.IdBeneficiario,
+        Beneficiario.IdCuenta,
+        Beneficiario.IdPersona,
+        Persona.IdTipoDocuIdentidad,
+        Persona.ValorDocumentoIdentidad,
+        Persona.Nombre,
+        Persona.FechaNacimiento,
+        Persona.Email,
+        Persona.Telefono1,
+        Persona.Telefono2,
+        Beneficiario.IdParentezco,
+        Beneficiario.Porcentaje
+    FROM dbo.Beneficiario
+    INNER JOIN dbo.Persona
+        ON Beneficiario.IdPersona = Persona.IdPersona
+    WHERE Beneficiario.IdBeneficiario = @IdBeneficiario
+      AND Beneficiario.IdCuenta = @IdCuenta
+      AND Beneficiario.Activo = 1;
+END;

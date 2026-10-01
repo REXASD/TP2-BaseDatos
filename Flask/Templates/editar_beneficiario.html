@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<body>
+
+<h1>Editar beneficiario</h1>
+
+{% if error %}
+    <p>{{ error }}</p>
+{% endif %}
+
+<form method="POST">
+
+    <label>Documento</label>
+    <input
+        type="text"
+        name="documento"
+        value="{{ beneficiario.ValorDocumentoIdentidad }}"
+        required
+    >
+
+    <br><br>
+
+    <label>Nombre</label>
+    <input
+        type="text"
+        name="nombre"
+        value="{{ beneficiario.Nombre }}"
+        required
+    >
+
+    <br><br>
+
+    <label>Fecha nacimiento</label>
+    <input
+        type="date"
+        name="fecha_nacimiento"
+        value="{{ beneficiario.FechaNacimiento }}"
+        required
+    >
+
+    <br><br>
+
+    <label>Email</label>
+    <input
+        type="email"
+        name="email"
+        value="{{ beneficiario.Email or '' }}"
+    >
+
+    <br><br>
+
+    <label>Teléfono 1</label>
+    <input
+        type="text"
+        name="telefono1"
+        value="{{ beneficiario.Telefono1 or '' }}"
+    >
+
+    <br><br>
+
+    <label>Teléfono 2</label>
+    <input
+        type="text"
+        name="telefono2"
+        value="{{ beneficiario.Telefono2 or '' }}"
+    >
+
+    <br><br>
+
+    <label>Parentesco</label>
+
+    <select name="id_parentezco" required>
+
+        {% for parentesco in parentescos %}
+
+            <option
+                value="{{ parentesco.Id }}"
+                {% if parentesco.Id == beneficiario.IdParentezco %}
+                    selected
+                {% endif %}
+            >
+                {{ parentesco.Nombre }}
+            </option>
+
+        {% endfor %}
+
+    </select>
+
+    <br><br>
+
+    <label>Porcentaje</label>
+
+    <input
+        type="number"
+        name="porcentaje"
+        min="0"
+        max="100"
+        value="{{ beneficiario.Porcentaje }}"
+        required
+    >
+
+    <br><br>
+
+    <button type="submit">
+        Guardar cambios
+    </button>
+
+</form>
+
+<br>
+
+<a href="{{ url_for('beneficiarios', id_cuenta=id_cuenta) }}">
+    Volver
+</a>
+
+</body>
+</html>

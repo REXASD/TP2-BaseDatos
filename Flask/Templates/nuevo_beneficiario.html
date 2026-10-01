@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<body>
+
+<h1>Nuevo beneficiario</h1>
+
+{% if error %}
+    <p>{{ error }}</p>
+{% endif %}
+
+<form method="POST">
+
+    <label>Tipo documento</label>
+    <select name="id_tipo_documento" required>
+        {% for tipo in tipos_documento %}
+            <option value="{{ tipo.Id }}">
+                {{ tipo.Nombre }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <br><br>
+
+    <label>Documento</label>
+    <input type="text" name="documento" required>
+
+    <br><br>
+
+    <label>Nombre</label>
+    <input type="text" name="nombre" required>
+
+    <br><br>
+
+    <label>Fecha nacimiento</label>
+    <input type="date" name="fecha_nacimiento" required>
+
+    <br><br>
+
+    <label>Email</label>
+    <input type="email" name="email">
+
+    <br><br>
+
+    <label>Teléfono 1</label>
+    <input type="text" name="telefono1">
+
+    <br><br>
+
+    <label>Teléfono 2</label>
+    <input type="text" name="telefono2">
+
+    <br><br>
+
+    <label>Parentesco</label>
+    <select name="id_parentezco" required>
+        {% for parentesco in parentescos %}
+            <option value="{{ parentesco.Id }}">
+                {{ parentesco.Nombre }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <br><br>
+
+    <label>Porcentaje</label>
+    <input type="number" name="porcentaje" min="0" max="100" required>
+
+    <br><br>
+
+    <button type="submit">Agregar</button>
+
+</form>
+
+</body>
+</html>

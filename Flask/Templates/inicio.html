@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Inicio</title>
+</head>
+
+<body>
+
+    <h1>Bienvenido {{ usuario }}</h1>
+
+    <h2>Mis cuentas</h2>
+
+    {% for cuenta in cuentas %}
+
+    <p>
+        Cuenta: {{ cuenta.NumeroCuenta }}
+        |
+        Saldo: {{ cuenta.Saldo }}
+
+        <a href="{{ url_for('beneficiarios', id_cuenta=cuenta.IdCuenta) }}">
+            Ver beneficiarios
+        </a>
+    </p>
+
+{% endfor %}
+
+</body>
+</html>
