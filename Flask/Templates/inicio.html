@@ -29,7 +29,7 @@
             <tbody>
                 {% for cuenta in cuentas %}
                 <tr>
-                    <td>{{ cuenta.NumCuenta or cuenta.IdCuenta }}</td>
+                    <td>{{ cuenta.NumeroCuenta or cuenta.IdCuenta }}</td>
                     <td>{{ cuenta.Saldo if cuenta.Saldo is not none else 'N/A' }}</td>
                     <td class="acciones">
                         <a href="{{ url_for('beneficiarios', id_cuenta=cuenta.IdCuenta) }}" class="btn btn-primary">
