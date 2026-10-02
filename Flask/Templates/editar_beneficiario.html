@@ -52,7 +52,7 @@
                 <label for="id_parentezco">Parentesco:</label>
                 <select id="id_parentezco" name="id_parentezco" required>
                     {% for p in parentescos %}
-                    <option value="{{ p.IdParentezco or p.IdParentesco }}" {% if (p.IdParentezco or p.IdParentesco)= =beneficiario.IdParentezco %}selected{% endif %}>
+                    <option value="{{ p.IdParentezco or p.IdParentesco }}" {% if (p.IdParentezco or p.IdParentesco) == beneficiario.IdParentezco  %}selected{% endif %}>
                         {{ p.Nombre or p.Descripcion }}
                     </option>
                     {% endfor %}
