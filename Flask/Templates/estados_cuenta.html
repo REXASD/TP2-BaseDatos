@@ -1,41 +1,44 @@
 <!DOCTYPE html>
 <html lang="es">
-
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estados de Cuenta - Cuenta {{ id_cuenta }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/estilos.css') }}">
+</head>
 <body>
 
-<h1>Estados de cuenta</h1>
+    <div class="container container-wide">
+        <header class="header-bar">
+            <h1>Estados de Cuenta (Cuenta #{{ id_cuenta }})</h1>
+            <a href="{{ url_for('inicio') }}" class="btn btn-secondary">Volver al Inicio</a>
+        </header>
 
-{% if estados %}
-
-    {% for estado in estados %}
-
-        <p>
-            Desde: {{ estado.FechaInicio }}
-            |
-            Hasta: {{ estado.FechaFin }}
-            |
-            Saldo inicial: {{ estado.SaldoInicial }}
-            |
-            Saldo final: {{ estado.SaldoFinal }}
-            |
-            Intereses: {{ estado.InteresesAcumulados }}
-            |
-            Retiros: {{ estado.CantidadRetiros }}
-            |
-            Depósitos: {{ estado.CantidadDepositos }}
-        </p>
-
-    {% endfor %}
-
-{% else %}
-
-    <p>No hay estados de cuenta disponibles.</p>
-
-{% endif %}
-
-<a href="{{ url_for('inicio') }}">
-    Volver
-</a>
+        {% if estados %}
+        <div class="table-responsive">
+            <table class="tabla-cuentas">
+                <thead>
+                    <tr>
+                        {% for columna in estados[0].keys() %}
+                        <th>{{ columna }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for estado in estados %}
+                    <tr>
+                        {% for valor in estado.values() %}
+                        <td>{{ valor if valor is not none else 'N/A' }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No hay registros de estados de cuenta disponibles para esta cuenta.</p>
+        {% endif %}
+    </div>
 
 </body>
 </html>

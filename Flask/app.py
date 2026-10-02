@@ -11,7 +11,7 @@ DB_PASSWORD = "Maic#2026!Maic"
 def obtener_conexion():
     cadena_conexion = (
         "DRIVER={ODBC Driver 18 for SQL Server};"
-        "SERVER=tcp:tp2-basedatos.database.windows.net;"
+        "SERVER=tcp:tp2-basedatos.database.windows.net,1433;"
         "DATABASE=TP2-BaseDatos;"
         f"UID={DB_USER};"
         f"PWD={DB_PASSWORD};"

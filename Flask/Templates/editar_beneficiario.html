@@ -1,118 +1,75 @@
 <!DOCTYPE html>
 <html lang="es">
-
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Beneficiario</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/estilos.css') }}">
+</head>
 <body>
 
-<h1>Editar beneficiario</h1>
+    <div class="container container-form">
+        <h2>Editar Beneficiario</h2>
 
-{% if error %}
-    <p>{{ error }}</p>
-{% endif %}
+        {% if error %}
+        <div class="alert-error">
+            {{ error }}
+        </div>
+        {% endif %}
 
-<form method="POST">
+        <form action="{{ url_for('editar_beneficiario', id_cuenta=id_cuenta, id_beneficiario=beneficiario.IdBeneficiario) }}" method="POST">
+            <div class="form-group">
+                <label for="nombre">Nombre Completo:</label>
+                <input type="text" id="nombre" name="nombre" value="{{ beneficiario.Nombre }}" required>
+            </div>
 
-    <label>Documento</label>
-    <input
-        type="text"
-        name="documento"
-        value="{{ beneficiario.ValorDocumentoIdentidad }}"
-        required
-    >
+            <div class="form-group">
+                <label for="documento">Número de Documento:</label>
+                <input type="text" id="documento" name="documento" value="{{ beneficiario.ValorDocumentoIdentidad or beneficiario.Documento }}" required>
+            </div>
 
-    <br><br>
+            <div class="form-group">
+                <label for="fecha_nacimiento">Fecha de Nacimiento:</label>
+                <input type="date" id="fecha_nacimiento" name="fecha_nacimiento" value="{{ beneficiario.FechaNacimiento }}" required>
+            </div>
 
-    <label>Nombre</label>
-    <input
-        type="text"
-        name="nombre"
-        value="{{ beneficiario.Nombre }}"
-        required
-    >
+            <div class="form-group">
+                <label for="email">Correo Electrónico:</label>
+                <input type="email" id="email" name="email" value="{{ beneficiario.Email }}" required>
+            </div>
 
-    <br><br>
+            <div class="form-group">
+                <label for="telefono1">Teléfono Principal:</label>
+                <input type="tel" id="telefono1" name="telefono1" value="{{ beneficiario.Telefono1 }}" required>
+            </div>
 
-    <label>Fecha nacimiento</label>
-    <input
-        type="date"
-        name="fecha_nacimiento"
-        value="{{ beneficiario.FechaNacimiento }}"
-        required
-    >
+            <div class="form-group">
+                <label for="telefono2">Teléfono Secundario:</label>
+                <input type="tel" id="telefono2" name="telefono2" value="{{ beneficiario.Telefono2 or '' }}">
+            </div>
 
-    <br><br>
+            <div class="form-group">
+                <label for="id_parentezco">Parentesco:</label>
+                <select id="id_parentezco" name="id_parentezco" required>
+                    {% for p in parentescos %}
+                    <option value="{{ p.IdParentezco or p.IdParentesco }}" {% if (p.IdParentezco or p.IdParentesco)= =beneficiario.IdParentezco %}selected{% endif %}>
+                        {{ p.Nombre or p.Descripcion }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
 
-    <label>Email</label>
-    <input
-        type="email"
-        name="email"
-        value="{{ beneficiario.Email or '' }}"
-    >
+            <div class="form-group">
+                <label for="porcentaje">Porcentaje (%):</label>
+                <input type="number" id="porcentaje" name="porcentaje" value="{{ beneficiario.Porcentaje }}" min="0" max="100" step="0.01" required>
+            </div>
 
-    <br><br>
-
-    <label>Teléfono 1</label>
-    <input
-        type="text"
-        name="telefono1"
-        value="{{ beneficiario.Telefono1 or '' }}"
-    >
-
-    <br><br>
-
-    <label>Teléfono 2</label>
-    <input
-        type="text"
-        name="telefono2"
-        value="{{ beneficiario.Telefono2 or '' }}"
-    >
-
-    <br><br>
-
-    <label>Parentesco</label>
-
-    <select name="id_parentezco" required>
-
-        {% for parentesco in parentescos %}
-
-            <option
-                value="{{ parentesco.Id }}"
-                {% if parentesco.Id == beneficiario.IdParentezco %}
-                    selected
-                {% endif %}
-            >
-                {{ parentesco.Nombre }}
-            </option>
-
-        {% endfor %}
-
-    </select>
-
-    <br><br>
-
-    <label>Porcentaje</label>
-
-    <input
-        type="number"
-        name="porcentaje"
-        min="0"
-        max="100"
-        value="{{ beneficiario.Porcentaje }}"
-        required
-    >
-
-    <br><br>
-
-    <button type="submit">
-        Guardar cambios
-    </button>
-
-</form>
-
-<br>
-
-<a href="{{ url_for('beneficiarios', id_cuenta=id_cuenta) }}">
-    Volver
-</a>
+            <div class="acciones">
+                <button type="submit" class="btn btn-primary">Actualizar Cambios</button>
+                <a href="{{ url_for('beneficiarios', id_cuenta=id_cuenta) }}" class="btn btn-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
 
 </body>
 </html>

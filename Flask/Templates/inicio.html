@@ -2,36 +2,51 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Inicio</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio - Panel de Cuentas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/estilos.css') }}">
 </head>
-
 <body>
 
-    <h1>Bienvenido {{ usuario }}</h1>
+    <div class="container">
+        <header class="header-bar">
+            <h1>Bienvenido, {{ usuario }}</h1>
+            <a href="{{ url_for('logout') }}" class="btn btn-danger">Cerrar Sesión</a>
+        </header>
 
-    <h2>Mis cuentas</h2>
+        <h2>Tus Cuentas</h2>
 
-    {% for cuenta in cuentas %}
-
-    <p>
-        Cuenta: {{ cuenta.NumeroCuenta }}
-        |
-        Saldo: {{ cuenta.Saldo }}
-
-        <a href="{{ url_for('estados_cuenta', id_cuenta=cuenta.IdCuenta) }}">
-            Estados de cuenta
-        </a>
-
-        <a href="{{ url_for('beneficiarios', id_cuenta=cuenta.IdCuenta) }}">
-            Ver beneficiarios
-        </a>
-    </p>
-
-    {% endfor %}
-
-    <a href="{{ url_for('logout') }}">
-        Cerrar sesión
-    </a>
+        {% if cuentas %}
+        <table class="tabla-cuentas">
+            <thead>
+                <tr>
+                    <!-- Ajusta las columnas según los campos de tu procedimiento sp_ObtenerCuentasUsuario -->
+                    <th>Número de Cuenta</th>
+                    <th>Saldo</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cuenta in cuentas %}
+                <tr>
+                    <td>{{ cuenta.NumCuenta or cuenta.IdCuenta }}</td>
+                    <td>{{ cuenta.Saldo if cuenta.Saldo is not none else 'N/A' }}</td>
+                    <td class="acciones">
+                        <a href="{{ url_for('beneficiarios', id_cuenta=cuenta.IdCuenta) }}" class="btn btn-primary">
+                            Beneficiarios
+                        </a>
+                        <a href="{{ url_for('estados_cuenta', id_cuenta=cuenta.IdCuenta) }}" class="btn btn-secondary">
+                            Estados de Cuenta
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No tienes cuentas registradas asociadas a tu usuario.</p>
+        {% endif %}
+    </div>
 
 </body>
 </html>
