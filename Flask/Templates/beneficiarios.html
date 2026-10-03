@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Beneficiarios - Cuenta {{ id_cuenta }}</title>
+    <title>Beneficiarios - Cuenta {{ numero_cuenta }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles/estilos.css') }}">
 </head>
 <body>
 
     <div class="container">
         <header class="header-bar">
-            <h1>Beneficiarios (Cuenta #{{ id_cuenta }})</h1>
+            <h1>Beneficiarios (Cuenta #{{ numero_cuenta }})</h1>
             <a href="{{ url_for('inicio') }}" class="btn btn-secondary">Volver al Inicio</a>
         </header>
 

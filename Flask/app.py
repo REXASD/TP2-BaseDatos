@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session
+import time
 import pyodbc
 
 app = Flask(__name__)
@@ -11,7 +12,7 @@ DB_PASSWORD = "Maic#2026!Maic"
 def obtener_conexion():
     cadena_conexion = (
         "DRIVER={ODBC Driver 18 for SQL Server};"
-        "SERVER=tcp:tp2-basedatos.database.windows.net,1433;"
+        "SERVER=tp2-basedatos.database.windows.net;"
         "DATABASE=TP2-BaseDatos;"
         f"UID={DB_USER};"
         f"PWD={DB_PASSWORD};"
@@ -19,7 +20,17 @@ def obtener_conexion():
         "TrustServerCertificate=no;"
         "Connection Timeout=30;"
     )
-    return pyodbc.connect(cadena_conexion)
+
+    ultimo_error = None
+
+    for intento in range(3):
+        try:
+            return pyodbc.connect(cadena_conexion)
+        except pyodbc.OperationalError as error:
+            ultimo_error = error
+            time.sleep(10)
+
+    raise ultimo_error
 
 def usuario_puede_ver_cuenta(id_usuario, id_cuenta):
     conexion = obtener_conexion()
@@ -141,14 +152,35 @@ def inicio():
 @app.route("/cuenta/<int:id_cuenta>/beneficiarios")
 def beneficiarios(id_cuenta):
 
+    if "id_usuario" not in session:
+        return redirect(url_for("login"))
+
     if not usuario_puede_ver_cuenta(
         session["id_usuario"],
         id_cuenta
-        ):
+    ):
         return "No tiene permiso para acceder a esta cuenta", 403
 
     conexion = obtener_conexion()
     cursor = conexion.cursor()
+
+    # Obtener numero de cuenta
+    cursor.execute(
+        """
+        EXEC dbo.sp_ObtenerCuentasUsuario
+            @IdUsuario=?;
+        """,
+        session["id_usuario"]
+    )
+
+    cuentas = cursor.fetchall()
+
+    numero_cuenta = None
+
+    for cuenta in cuentas:
+        if cuenta.IdCuenta == id_cuenta:
+            numero_cuenta = cuenta.NumeroCuenta
+            break
 
     # Obtener beneficiarios
     cursor.execute(
@@ -188,6 +220,7 @@ def beneficiarios(id_cuenta):
         "beneficiarios.html",
         beneficiarios=lista_beneficiarios,
         id_cuenta=id_cuenta,
+        numero_cuenta=numero_cuenta,
         total_porcentaje=total_porcentaje,
         porcentaje_correcto=porcentaje_correcto
     )
@@ -646,6 +679,24 @@ def estados_cuenta(id_cuenta):
     conexion = obtener_conexion()
     cursor = conexion.cursor()
 
+     # Obtener las cuentas del usuario
+    cursor.execute(
+        """
+        EXEC dbo.sp_ObtenerCuentasUsuario
+            @IdUsuario=?;
+        """,
+        session["id_usuario"]
+    )
+
+    cuentas = cursor.fetchall()
+
+    numero_cuenta = None
+
+    for cuenta in cuentas:
+        if cuenta.IdCuenta == id_cuenta:
+            numero_cuenta = cuenta.NumeroCuenta
+            break
+
     cursor.execute(
         """
         EXEC dbo.sp_ObtenerEstadosCuenta
@@ -672,7 +723,8 @@ def estados_cuenta(id_cuenta):
     return render_template(
         "estados_cuenta.html",
         estados=estados,
-        id_cuenta=id_cuenta
+        id_cuenta=id_cuenta,
+        numero_cuenta=numero_cuenta
     )
 
 @app.route("/logout")
