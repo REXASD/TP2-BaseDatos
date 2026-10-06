@@ -52,7 +52,7 @@
                 <label for="id_parentezco">Parentesco:</label>
                 <select id="id_parentezco" name="id_parentezco" required>
                     {% for p in parentescos %}
-                    <option value="{{ p.IdParentezco or p.IdParentesco }}" {% if (p.IdParentezco or p.IdParentesco) == beneficiario.IdParentezco  %}selected{% endif %}>
+                    <option value="{{ p.Id }}" {% if p.Id == beneficiario.IdParentezco %}selected{% endif %}>
                         {{ p.Nombre or p.Descripcion }}
                     </option>
                     {% endfor %}
@@ -61,7 +61,7 @@
 
             <div class="form-group">
                 <label for="porcentaje">Porcentaje (%):</label>
-                <input type="number" id="porcentaje" name="porcentaje" value="{{ beneficiario.Porcentaje }}" min="0" max="100" step="0.01" required>
+                <input type="number" id="porcentaje" name="porcentaje" value="{{ beneficiario.Porcentaje }}" min="0" max="100" step="1" required>
             </div>
 
             <div class="acciones">

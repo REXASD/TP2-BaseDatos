@@ -25,7 +25,7 @@ def obtener_conexion():
 
     for intento in range(3):
         try:
-            return pyodbc.connect(cadena_conexion)
+            return pyodbc.connect(cadena_conexion, autocommit=True)
         except pyodbc.OperationalError as error:
             ultimo_error = error
             time.sleep(10)

@@ -20,9 +20,9 @@
             </div>
             <div>
                 {% if porcentaje_correcto %}
-                <span class="badge badge-success">  Prueba</span>
+                <span class="badge badge-success">  Aprobado </span>
                 {% else %}
-                <span class="badge badge-warning"> Prueba</span>
+                <span class="badge badge-warning"> Falta porcentaje por asignar </span>
                 {% endif %}
             </div>
         </div>
@@ -52,7 +52,7 @@
                     <td>{{ b.Parentesco or b.Parentezco }}</td>
                     <td>
                         <form action="{{ url_for('actualizar_porcentaje_beneficiario', id_cuenta=id_cuenta, id_beneficiario=b.IdBeneficiario) }}" method="POST" class="form-inline">
-                            <input type="number" name="porcentaje" value="{{ b.Porcentaje }}" min="0" max="100" step="0.01" required>
+                            <input type="number" name="porcentaje" value="{{ b.Porcentaje }}" min="0" max="100" step="1" required>
                             <button type="submit" class="btn btn-secondary btn-inline">💾</button>
                         </form>
                     </td>

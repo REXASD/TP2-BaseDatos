@@ -729,7 +729,7 @@ END;
 -- 14. Obtener beneficiario por id
 -- ============================================================
 
-CREATE OR ALTER   PROCEDURE [dbo].[sp_ObtenerBeneficiarioPorId]
+CREATE OR ALTER  PROCEDURE [dbo].[sp_ObtenerBeneficiarioPorId]
     @IdBeneficiario INT,
     @IdCuenta INT
 AS
