@@ -1,8 +1,4 @@
-IF OBJECT_ID('dbo.sp_CargarDatosPrueba', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.sp_CargarDatosPrueba;
-GO
-
-CREATE PROCEDURE dbo.sp_CargarDatosPrueba
+CREATE OR ALTER PROCEDURE dbo.sp_CargarDatosPrueba
     @xmlData XML
 AS
 BEGIN
@@ -10,12 +6,34 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
+        /* ---------- 0. LIMPIEZA DE DATOS PREVIOS ---------- */
+        DELETE FROM dbo.Bitacora;
+        DELETE FROM dbo.UsuarioCuenta;
+        DELETE FROM dbo.EstadoDeCuenta;
+        DELETE FROM dbo.Beneficiario;
+        DELETE FROM dbo.Cuenta;
+        DELETE FROM dbo.Usuario;
+        DELETE FROM dbo.Persona;
+        DELETE FROM dbo.TipoCuentaAhorro;
+        DELETE FROM dbo.TipoOperaciones;
+        DELETE FROM dbo.Parentezco;
+        DELETE FROM dbo.TipoDocuIdentidad;
+        DELETE FROM dbo.TipoMoneda;
+
+        DBCC CHECKIDENT ('dbo.Persona', RESEED, 0);
+        DBCC CHECKIDENT ('dbo.Cuenta', RESEED, 0);
+        DBCC CHECKIDENT ('dbo.Beneficiario', RESEED, 0);
+        DBCC CHECKIDENT ('dbo.EstadoDeCuenta', RESEED, 0);
+        DBCC CHECKIDENT ('dbo.Usuario', RESEED, 0);
+        DBCC CHECKIDENT ('dbo.UsuarioCuenta', RESEED, 0);
+        DBCC CHECKIDENT ('dbo.Bitacora', RESEED, 0);
+
         /* ---------- 1. TipoMoneda ---------- */
         INSERT INTO dbo.TipoMoneda (Id, Nombre, Simbolo)
         SELECT
             T.c.value('@Id', 'INT'),
             T.c.value('@Nombre', 'VARCHAR(128)'),
-            T.c.value('@Simbolo', 'NVARCHAR(10)')
+            T.c.value('@Simbolo', 'NVARCHAR(2)')
         FROM @xmlData.nodes('/DatosPrueba/Tipo_Moneda/TipoMoneda') AS T(c);
 
         /* ---------- 2. TipoDocuIdentidad ---------- */
@@ -94,7 +112,7 @@ BEGIN
         SELECT
             cu.IdCuenta,
             pe.IdPersona,
-            T.c.value('@ParentezcoId', 'INT'),
+            T.c.value('@IdParentezco', 'INT'),
             T.c.value('@Porcentaje', 'INT')
         FROM @xmlData.nodes('/DatosPrueba/Beneficiarios/Beneficiario') AS T(c)
         INNER JOIN dbo.Cuenta cu
@@ -104,29 +122,36 @@ BEGIN
 
         /* ---------- 9. EstadoDeCuenta ---------- */
         INSERT INTO dbo.EstadoDeCuenta (
-            IdCuenta, FechaInicio, FechaFin, SaldoInicial, SaldoFinal,
-            InteresesAcumulados, CantidadRetiros, CantidadDepositos
+            IdCuenta, FechaInicio, FechaFin, SaldoInicial, SaldoMinimo, SaldoFinal,
+            InteresesAcumulados, CantidadRetiros, CantidadDepositos, 
+            CantidadSinpeEntrantes, CantidadSinpeSalientes
         )
         SELECT
             cu.IdCuenta,
             T.c.value('@fechaInicio', 'DATE'),
             T.c.value('@fechafin', 'DATE'),
             T.c.value('@saldoinicial', 'DECIMAL(18,2)'),
+            T.c.value('@saldoMinimo', 'DECIMAL(18,2)'),
             T.c.value('@saldo_final', 'DECIMAL(18,2)'),
             T.c.value('@interesesAcumulados', 'DECIMAL(18,2)'),
             T.c.value('@cantidadRetiros', 'INT'),
-            T.c.value('@cantidadDepositos', 'INT')
+            T.c.value('@cantidadDepositos', 'INT'),
+            T.c.value('@cantSinpeEntrantes', 'INT'),
+            T.c.value('@cantSinpeSalientes', 'INT')
         FROM @xmlData.nodes('/DatosPrueba/Estados_de_Cuenta/Estado_de_Cuenta') AS T(c)
         INNER JOIN dbo.Cuenta cu
             ON cu.NumeroCuenta = T.c.value('@NumeroCuenta', 'VARCHAR(32)');
 
         /* ---------- 10. Usuario ---------- */
-        INSERT INTO dbo.Usuario ([User], Pass, EsAdministrador)
+        INSERT INTO dbo.Usuario ([User], Pass, EsAdministrador, IdPersona)
         SELECT
             T.c.value('@User', 'VARCHAR(64)'),
             T.c.value('@Pass', 'VARCHAR(255)'),
-            T.c.value('@EsAdministrador', 'BIT')
-        FROM @xmlData.nodes('/DatosPrueba/Usuarios/Usuario') AS T(c);
+            T.c.value('@EsAdministrador', 'BIT'),
+            p.IdPersona
+        FROM @xmlData.nodes('/DatosPrueba/Usuarios/Usuario') AS T(c)
+        INNER JOIN dbo.Persona p
+            ON p.ValorDocumentoIdentidad = T.c.value('@ValorDocId', 'VARCHAR(64)');
 
         /* ---------- 11. UsuarioCuenta ---------- */
         INSERT INTO dbo.UsuarioCuenta (IdUsuario, IdCuenta)

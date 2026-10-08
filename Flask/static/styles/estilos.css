@@ -194,3 +194,39 @@ h1, h2 {
     margin-bottom: 20px;
     border: 1px solid #fca5a5;
 }
+
+/* Alerta llamativa: porcentajes de beneficiarios no suman 100 */
+.alerta-porcentaje {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background-color: #dc2626;
+    color: #ffffff;
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 16px;
+    font-weight: bold;
+    border: 3px solid #7f1d1d;
+    box-shadow: 0 0 0 4px #fecaca;
+    animation: pulso-alerta 1.4s ease-in-out infinite;
+}
+
+    .alerta-porcentaje .alerta-icono {
+        font-size: 28px;
+    }
+
+@keyframes pulso-alerta {
+    0%, 100% {
+        box-shadow: 0 0 0 4px #fecaca;
+    }
+
+    50% {
+        box-shadow: 0 0 0 10px #fee2e2;
+    }
+}
+
+.btn-bloqueado {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

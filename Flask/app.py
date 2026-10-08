@@ -59,6 +59,37 @@ def usuario_puede_ver_cuenta(id_usuario, id_cuenta):
     return puede_ver
 
 
+# Endpoints permitidos mientras los porcentajes de beneficiarios de una
+# cuenta no sumen 100 (solo la seccion de beneficiarios de esa cuenta).
+ENDPOINTS_PERMITIDOS_CON_PENDIENTE = {
+    "static",
+    "login",
+    "logout",
+    "beneficiarios",
+    "nuevo_beneficiario",
+    "editar_beneficiario",
+    "eliminar_beneficiario",
+    "actualizar_porcentaje_beneficiario",
+}
+
+@app.before_request
+def bloquear_salida_si_porcentaje_incorrecto():
+    id_pendiente = session.get("cuenta_porcentaje_pendiente")
+
+    if id_pendiente is None or "id_usuario" not in session:
+        return None
+
+    if request.endpoint in ("static", "login", "logout"):
+        return None
+
+    if request.endpoint in ENDPOINTS_PERMITIDOS_CON_PENDIENTE:
+        id_solicitada = (request.view_args or {}).get("id_cuenta")
+        if id_solicitada == id_pendiente:
+            return None
+
+    return redirect(url_for("beneficiarios", id_cuenta=id_pendiente))
+
+
 @app.route("/", methods=["GET", "POST"])
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -215,6 +246,12 @@ def beneficiarios(id_cuenta):
 
     cursor.close()
     conexion.close()
+
+    # Si hay beneficiarios y no suman 100, se bloquea la salida
+    if not porcentaje_correcto and len(lista_beneficiarios) > 0:
+        session["cuenta_porcentaje_pendiente"] = id_cuenta
+    else:
+        session.pop("cuenta_porcentaje_pendiente", None)
 
     return render_template(
         "beneficiarios.html",

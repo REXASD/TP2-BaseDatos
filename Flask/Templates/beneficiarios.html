@@ -11,8 +11,19 @@
     <div class="container">
         <header class="header-bar">
             <h1>Beneficiarios (Cuenta #{{ numero_cuenta }})</h1>
+            {% if porcentaje_correcto or not beneficiarios %}
             <a href="{{ url_for('inicio') }}" class="btn btn-secondary">Volver al Inicio</a>
+            {% else %}
+            <span class="btn btn-secondary btn-bloqueado" title="Corrija los porcentajes para poder salir">Volver al Inicio</span>
+            {% endif %}
         </header>
+
+        {% if not porcentaje_correcto %}
+        <div class="alerta-porcentaje" role="alert">
+            <span class="alerta-icono">⚠️</span>
+            <span>La suma de los porcentajes de sus beneficiarios no suma 100, favor corregir</span>
+        </div>
+        {% endif %}
 
         <div class="resumen-porcentaje">
             <div>
@@ -22,7 +33,9 @@
                 {% if porcentaje_correcto %}
                 <span class="badge badge-success">  Aprobado </span>
                 {% else %}
-                <span class="badge badge-warning"> Falta porcentaje por asignar </span>
+                <span class="badge badge-warning">
+                    Problemas
+                </span>
                 {% endif %}
             </div>
         </div>
@@ -72,6 +85,22 @@
         <p>No hay beneficiarios registrados en esta cuenta.</p>
         {% endif %}
     </div>
+
+    {% if not porcentaje_correcto and beneficiarios %}
+    <script>
+                // Avisar si intenta cerrar/recargar la pestaña con porcentajes incorrectos
+                var enviandoFormulario = false;
+                document.querySelectorAll("form").forEach(function (f) {
+                    f.addEventListener("submit", function () { enviandoFormulario = true; });
+                });
+                window.addEventListener("beforeunload", function (e) {
+                    if (!enviandoFormulario) {
+                        e.preventDefault();
+                        e.returnValue = "";
+                    }
+                });
+    </script>
+    {% endif %}
 
 </body>
 </html>
