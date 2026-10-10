@@ -173,8 +173,17 @@ def no_encontrado(error):
 @app.errorhandler(pytds.Error)
 @app.errorhandler(TimeoutError)
 def error_base_datos(error):
-    # No mostrar al navegador credenciales ni mensajes internos de SQL Server.
-    app.logger.error('Error de conexión/consulta: %s', type(error).__name__)
+    # Mostrar el diagnóstico en la terminal, conservando el mensaje genérico
+    # del navegador. Ocultar contraseñas si aparecen en el texto del error.
+    detalle = str(error)
+    for secreto in (os.getenv('DB_PASSWORD', ''), request.form.get('password', '')):
+        if secreto:
+            detalle = detalle.replace(secreto, '[oculto]')
+    app.logger.error(
+        'Error SQL: %s | número=%s | procedimiento=%s | línea=%s | detalle=%s',
+        type(error).__name__, getattr(error, 'number', '?'),
+        getattr(error, 'procname', '?'), getattr(error, 'line', '?'), detalle,
+    )
     return render_template('error.html', mensaje='No se pudo completar la operación con la base de datos. Intente nuevamente.'), 503
 
 
