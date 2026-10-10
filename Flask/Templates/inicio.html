@@ -11,7 +11,10 @@
     <div class="container">
         <header class="header-bar">
             <h1>Bienvenido, {{ usuario }}</h1>
-            <a href="{{ url_for('logout') }}" class="btn btn-danger">Cerrar Sesión</a>
+            <form action="{{ url_for('logout') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-danger">Cerrar Sesión</button>
+            </form>
         </header>
 
         <h2>Tus Cuentas</h2>

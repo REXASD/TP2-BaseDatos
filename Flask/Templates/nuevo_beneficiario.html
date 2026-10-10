@@ -18,12 +18,13 @@
         {% endif %}
 
         <form action="{{ url_for('nuevo_beneficiario', id_cuenta=id_cuenta) }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label for="id_tipo_documento">Tipo de Documento:</label>
                 <select id="id_tipo_documento" name="id_tipo_documento" required>
                     <option value="">Seleccione un tipo...</option>
                     {% for td in tipos_documento %}
-                    <option value="{{ td.IdTipoDocuIdentidad or td.IdTipoDocumento }}">{{ td.Nombre or td.Descripcion }}</option>
+                    <option value="{{ td.Id }}">{{ td.Nombre or td.Descripcion }}</option>
                     {% endfor %}
                 </select>
             </div>

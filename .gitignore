@@ -217,3 +217,11 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 .vs/
+
+# Configuración local y Vercel
+.env
+.env.*
+!.env.example
+.vercel/
+__pycache__/
+.pytest_cache/

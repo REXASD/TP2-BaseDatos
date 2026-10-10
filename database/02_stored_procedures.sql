@@ -724,6 +724,7 @@ BEGIN
         Nombre
     FROM dbo.TipoDocuIdentidad;
 END;
+GO
 
 -- ============================================================
 -- 14. Obtener beneficiario por id
@@ -756,3 +757,4 @@ BEGIN
       AND Beneficiario.IdCuenta = @IdCuenta
       AND Beneficiario.Activo = 1;
 END;
+GO

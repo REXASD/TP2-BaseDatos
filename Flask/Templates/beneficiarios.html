@@ -65,6 +65,7 @@
                     <td>{{ b.Parentesco or b.Parentezco }}</td>
                     <td>
                         <form action="{{ url_for('actualizar_porcentaje_beneficiario', id_cuenta=id_cuenta, id_beneficiario=b.IdBeneficiario) }}" method="POST" class="form-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="number" name="porcentaje" value="{{ b.Porcentaje }}" min="0" max="100" step="1" required>
                             <button type="submit" class="btn btn-secondary btn-inline">💾</button>
                         </form>
@@ -74,6 +75,7 @@
                             Editar
                         </a>
                         <form action="{{ url_for('eliminar_beneficiario', id_cuenta=id_cuenta, id_beneficiario=b.IdBeneficiario) }}" method="POST" onsubmit="return confirm('¿Está seguro de eliminar este beneficiario?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger">Eliminar</button>
                         </form>
                     </td>
