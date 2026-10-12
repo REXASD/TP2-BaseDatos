@@ -134,8 +134,8 @@ BEGIN
             T.c.value('@saldoMinimo', 'DECIMAL(18,2)'),
             T.c.value('@saldo_final', 'DECIMAL(18,2)'),
             T.c.value('@interesesAcumulados', 'DECIMAL(18,2)'),
-            T.c.value('@cantidadRetiros', 'INT'),
-            T.c.value('@cantidadDepositos', 'INT'),
+            T.c.value('@cantRetiros', 'INT'),
+            T.c.value('@cantDepositos', 'INT'),
             T.c.value('@cantSinpeEntrantes', 'INT'),
             T.c.value('@cantSinpeSalientes', 'INT')
         FROM @xmlData.nodes('/DatosPrueba/Estados_de_Cuenta/Estado_de_Cuenta') AS T(c)

@@ -227,13 +227,16 @@ BEGIN
         FechaInicio,
         FechaFin,
         SaldoInicial,
+        SaldoMinimo,
         SaldoFinal,
         InteresesAcumulados,
         CantidadRetiros,
-        CantidadDepositos
+        CantidadDepositos,
+        CantidadSinpeEntrantes,
+        CantidadSinpeSalientes
     FROM dbo.EstadoDeCuenta
     WHERE IdCuenta = @IdCuenta
-    ORDER BY FechaFin DESC;
+    ORDER BY FechaFin DESC, IdEstadoCuenta DESC;
 END;
 GO
 

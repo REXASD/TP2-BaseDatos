@@ -230,3 +230,16 @@ h1, h2 {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+.tabla-estados .num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.tabla-estados .fila-clic {
+    cursor: pointer;
+}
+
+    .tabla-estados .fila-clic:hover {
+        background: rgba(0,0,0,.05);
+    }

@@ -1,3 +1,5 @@
 /*Creacion de la Base de Datos*/
 
-create database TP2-BaseDatos;
+CREATE DATABASE [TP2-BaseDatos];
+GO
+ 

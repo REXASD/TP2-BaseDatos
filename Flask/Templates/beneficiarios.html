@@ -21,7 +21,7 @@
         {% if not porcentaje_correcto %}
         <div class="alerta-porcentaje" role="alert">
             <span class="alerta-icono">⚠️</span>
-            <span>La suma de los porcentajes de sus beneficiarios no suma 100, favor corregir</span>
+            <span>La suma de los porcentajes de sus beneficiarios no suma 100, favor corregir y cancelar la edición</span>
         </div>
         {% endif %}
 
@@ -65,7 +65,7 @@
                     <td>{{ b.Parentesco or b.Parentezco }}</td>
                     <td>
                         <form action="{{ url_for('actualizar_porcentaje_beneficiario', id_cuenta=id_cuenta, id_beneficiario=b.IdBeneficiario) }}" method="POST" class="form-inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="number" name="porcentaje" value="{{ b.Porcentaje }}" min="0" max="100" step="1" required>
                             <button type="submit" class="btn btn-secondary btn-inline">💾</button>
                         </form>
@@ -75,7 +75,7 @@
                             Editar
                         </a>
                         <form action="{{ url_for('eliminar_beneficiario', id_cuenta=id_cuenta, id_beneficiario=b.IdBeneficiario) }}" method="POST" onsubmit="return confirm('¿Está seguro de eliminar este beneficiario?');">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger">Eliminar</button>
                         </form>
                     </td>
@@ -90,17 +90,17 @@
 
     {% if not porcentaje_correcto and beneficiarios %}
     <script>
-                // Avisar si intenta cerrar/recargar la pestaña con porcentajes incorrectos
-                var enviandoFormulario = false;
-                document.querySelectorAll("form").forEach(function (f) {
-                    f.addEventListener("submit", function () { enviandoFormulario = true; });
-                });
-                window.addEventListener("beforeunload", function (e) {
-                    if (!enviandoFormulario) {
-                        e.preventDefault();
-                        e.returnValue = "";
-                    }
-                });
+                        // Avisar si intenta cerrar/recargar la pestaña con porcentajes incorrectos
+                        var enviandoFormulario = false;
+                        document.querySelectorAll("form").forEach(function (f) {
+                            f.addEventListener("submit", function () { enviandoFormulario = true; });
+                        });
+                        window.addEventListener("beforeunload", function (e) {
+                            if (!enviandoFormulario) {
+                                e.preventDefault();
+                                e.returnValue = "";
+                            }
+                        });
     </script>
     {% endif %}
 

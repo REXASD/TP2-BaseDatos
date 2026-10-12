@@ -15,21 +15,37 @@
         </header>
 
         {% if estados %}
+        <p>Últimos {{ estados|length }} estados de cuenta, del más reciente al menos reciente.</p>
         <div class="table-responsive">
-            <table class="tabla-cuentas">
+            <table class="tabla-cuentas tabla-estados">
                 <thead>
                     <tr>
-                        {% for columna in estados[0].keys() %}
-                        <th>{{ columna }}</th>
-                        {% endfor %}
+                        <th>Fecha del estado</th>
+                        <th>Período</th>
+                        <th>Saldo inicial</th>
+                        <th>Saldo final</th>
+                        <th>Saldo mínimo</th>
+                        <th>Intereses acumulados</th>
+                        <th>Cant. retiros</th>
+                        <th>Cant. depósitos</th>
+                        <th>SINPE entrantes</th>
+                        <th>SINPE salientes</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for estado in estados %}
-                    <tr>
-                        {% for valor in estado.values() %}
-                        <td>{{ valor if valor is not none else 'N/A' }}</td>
-                        {% endfor %}
+                    {% for e in estados %}
+                    {# TP3: aquí se enlazará al detalle de movimientos del mes. #}
+                    <tr class="fila-clic" tabindex="0">
+                        <td>{{ e.FechaFin.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ e.FechaInicio.strftime('%d/%m/%Y') }} – {{ e.FechaFin.strftime('%d/%m/%Y') }}</td>
+                        <td class="num">{{ '{:,.2f}'.format(e.SaldoInicial) }}</td>
+                        <td class="num">{{ '{:,.2f}'.format(e.SaldoFinal) }}</td>
+                        <td class="num">{{ '{:,.2f}'.format(e.SaldoMinimo) }}</td>
+                        <td class="num">{{ '{:,.2f}'.format(e.InteresesAcumulados) }}</td>
+                        <td class="num">{{ e.CantidadRetiros }}</td>
+                        <td class="num">{{ e.CantidadDepositos }}</td>
+                        <td class="num">{{ e.CantidadSinpeEntrantes }}</td>
+                        <td class="num">{{ e.CantidadSinpeSalientes }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
