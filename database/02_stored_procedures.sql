@@ -1,10 +1,4 @@
 -- ============================================================
--- TP2 - Base de Datos
--- Stored Procedures
--- ============================================================
-
-
--- ============================================================
 -- 1. Registrar Bitacora
 -- ============================================================
 
@@ -52,9 +46,9 @@ BEGIN
     SET NOCOUNT ON;
 
     SELECT
-        Id,
-        Nombre
-    FROM dbo.Parentezco;
+        pa.Id,
+        pa.Nombre
+    FROM dbo.Parentezco AS pa;
 END;
 GO
 
@@ -73,10 +67,10 @@ BEGIN
 
     DECLARE @IdUsuario INT;
 
-    SELECT @IdUsuario = IdUsuario
-    FROM dbo.Usuario
-    WHERE [User] = @Usuario
-      AND Pass = @Password;
+    SELECT @IdUsuario = u.IdUsuario
+    FROM dbo.Usuario AS u
+    WHERE u.[User] = @Usuario
+      AND u.Pass = @Password;
 
     IF @IdUsuario IS NOT NULL
     BEGIN
@@ -87,11 +81,11 @@ BEGIN
             @IP = @IP;
 
         SELECT
-            IdUsuario,
-            [User],
-            EsAdministrador
-        FROM dbo.Usuario
-        WHERE IdUsuario = @IdUsuario;
+            u.IdUsuario,
+            u.[User],
+            u.EsAdministrador
+        FROM dbo.Usuario AS u
+        WHERE u.IdUsuario = @IdUsuario;
 
         RETURN 0;
     END
@@ -133,14 +127,14 @@ BEGIN
     SET NOCOUNT ON;
 
     SELECT
-        Cuenta.IdCuenta,
-        Cuenta.NumeroCuenta,
-        Cuenta.FechaCreacion,
-        Cuenta.Saldo
-    FROM dbo.UsuarioCuenta
-    INNER JOIN dbo.Cuenta
-        ON UsuarioCuenta.IdCuenta = Cuenta.IdCuenta
-    WHERE UsuarioCuenta.IdUsuario = @IdUsuario;
+        c.IdCuenta,
+        c.NumeroCuenta,
+        c.FechaCreacion,
+        c.Saldo
+    FROM dbo.UsuarioCuenta AS uc
+    INNER JOIN dbo.Cuenta AS c
+        ON uc.IdCuenta = c.IdCuenta
+    WHERE uc.IdUsuario = @IdUsuario;
 END;
 GO
 
@@ -156,26 +150,26 @@ BEGIN
     SET NOCOUNT ON;
 
     SELECT
-        Beneficiario.IdBeneficiario,
-        Beneficiario.IdCuenta,
-        Beneficiario.IdPersona,
-        Persona.IdTipoDocuIdentidad,
-        Persona.ValorDocumentoIdentidad,
-        Persona.Nombre,
-        Persona.FechaNacimiento,
-        Persona.Email,
-        Persona.Telefono1,
-        Persona.Telefono2,
-        Beneficiario.IdParentezco,
-        Parentezco.Nombre AS Parentezco,
-        Beneficiario.Porcentaje
-    FROM dbo.Beneficiario
-    INNER JOIN dbo.Persona
-        ON Beneficiario.IdPersona = Persona.IdPersona
-    INNER JOIN dbo.Parentezco
-        ON Beneficiario.IdParentezco = Parentezco.Id
-    WHERE Beneficiario.IdCuenta = @IdCuenta
-      AND Beneficiario.Activo = 1;
+        b.IdBeneficiario,
+        b.IdCuenta,
+        b.IdPersona,
+        p.IdTipoDocuIdentidad,
+        p.ValorDocumentoIdentidad,
+        p.Nombre,
+        p.FechaNacimiento,
+        p.Email,
+        p.Telefono1,
+        p.Telefono2,
+        b.IdParentezco,
+        pa.Nombre AS Parentezco,
+        b.Porcentaje
+    FROM dbo.Beneficiario AS b
+    INNER JOIN dbo.Persona AS p
+        ON b.IdPersona = p.IdPersona
+    INNER JOIN dbo.Parentezco AS pa
+        ON b.IdParentezco = pa.Id
+    WHERE b.IdCuenta = @IdCuenta
+      AND b.Activo = 1;
 END;
 GO
 
@@ -192,10 +186,10 @@ BEGIN
 
     DECLARE @TotalPorcentaje INT;
 
-    SELECT @TotalPorcentaje = ISNULL(SUM(Porcentaje), 0)
-    FROM dbo.Beneficiario
-    WHERE IdCuenta = @IdCuenta
-      AND Activo = 1;
+    SELECT @TotalPorcentaje = ISNULL(SUM(b.Porcentaje), 0)
+    FROM dbo.Beneficiario AS b
+    WHERE b.IdCuenta = @IdCuenta
+      AND b.Activo = 1;
 
     SELECT
         @TotalPorcentaje AS TotalPorcentaje,
@@ -223,20 +217,20 @@ BEGIN
         @IdTipoOperacion = 7;
 
     SELECT TOP 8
-        IdEstadoCuenta,
-        FechaInicio,
-        FechaFin,
-        SaldoInicial,
-        SaldoMinimo,
-        SaldoFinal,
-        InteresesAcumulados,
-        CantidadRetiros,
-        CantidadDepositos,
-        CantidadSinpeEntrantes,
-        CantidadSinpeSalientes
-    FROM dbo.EstadoDeCuenta
-    WHERE IdCuenta = @IdCuenta
-    ORDER BY FechaFin DESC, IdEstadoCuenta DESC;
+        ec.IdEstadoCuenta,
+        ec.FechaInicio,
+        ec.FechaFin,
+        ec.SaldoInicial,
+        ec.SaldoMinimo,
+        ec.SaldoFinal,
+        ec.InteresesAcumulados,
+        ec.CantidadRetiros,
+        ec.CantidadDepositos,
+        ec.CantidadSinpeEntrantes,
+        ec.CantidadSinpeSalientes
+    FROM dbo.EstadoDeCuenta AS ec
+    WHERE ec.IdCuenta = @IdCuenta
+    ORDER BY ec.FechaFin DESC, ec.IdEstadoCuenta DESC;
 END;
 GO
 
@@ -275,9 +269,9 @@ BEGIN
     DECLARE @CantidadBeneficiarios INT;
 
     SELECT @CantidadBeneficiarios = COUNT(*)
-    FROM dbo.Beneficiario
-    WHERE IdCuenta = @IdCuenta
-      AND Activo = 1;
+    FROM dbo.Beneficiario AS b
+    WHERE b.IdCuenta = @IdCuenta
+      AND b.Activo = 1;
 
     IF @CantidadBeneficiarios >= 3
     BEGIN
@@ -290,9 +284,9 @@ BEGIN
 
         DECLARE @IdPersona INT;
 
-        SELECT @IdPersona = IdPersona
-        FROM dbo.Persona
-        WHERE ValorDocumentoIdentidad = @ValorDocumentoIdentidad;
+        SELECT @IdPersona = p.IdPersona
+        FROM dbo.Persona AS p
+        WHERE p.ValorDocumentoIdentidad = @ValorDocumentoIdentidad;
 
         IF @IdPersona IS NULL
         BEGIN
@@ -350,15 +344,15 @@ BEGIN
         SELECT @JsonDespues =
         (
             SELECT
-                IdBeneficiario,
-                IdCuenta,
-                IdPersona,
-                IdParentezco,
-                Porcentaje,
-                Activo,
-                FechaDesactivacion
-            FROM dbo.Beneficiario
-            WHERE IdBeneficiario = @IdBeneficiario
+                b.IdBeneficiario,
+                b.IdCuenta,
+                b.IdPersona,
+                b.IdParentezco,
+                b.Porcentaje,
+                b.Activo,
+                b.FechaDesactivacion
+            FROM dbo.Beneficiario AS b
+            WHERE b.IdBeneficiario = @IdBeneficiario
             FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
         );
 
@@ -421,9 +415,9 @@ BEGIN
     IF NOT EXISTS
     (
         SELECT 1
-        FROM dbo.Beneficiario
-        WHERE IdBeneficiario = @IdBeneficiario
-          AND Activo = 1
+        FROM dbo.Beneficiario AS b
+        WHERE b.IdBeneficiario = @IdBeneficiario
+          AND b.Activo = 1
     )
     BEGIN
         RETURN 1;
@@ -439,59 +433,60 @@ BEGIN
         SELECT @JsonAntes =
         (
             SELECT
-                Beneficiario.IdBeneficiario,
-                Beneficiario.IdCuenta,
-                Beneficiario.IdPersona,
-                Beneficiario.IdParentezco,
-                Beneficiario.Porcentaje,
-                Persona.Nombre,
-                Persona.ValorDocumentoIdentidad,
-                Persona.FechaNacimiento,
-                Persona.Email,
-                Persona.Telefono1,
-                Persona.Telefono2
-            FROM dbo.Beneficiario
-            INNER JOIN dbo.Persona
-                ON Beneficiario.IdPersona = Persona.IdPersona
-            WHERE Beneficiario.IdBeneficiario = @IdBeneficiario
+                b.IdBeneficiario,
+                b.IdCuenta,
+                b.IdPersona,
+                b.IdParentezco,
+                b.Porcentaje,
+                p.Nombre,
+                p.ValorDocumentoIdentidad,
+                p.FechaNacimiento,
+                p.Email,
+                p.Telefono1,
+                p.Telefono2
+            FROM dbo.Beneficiario AS b
+            INNER JOIN dbo.Persona AS p
+                ON b.IdPersona = p.IdPersona
+            WHERE b.IdBeneficiario = @IdBeneficiario
             FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
         );
 
-        UPDATE dbo.Beneficiario
-        SET IdParentezco = @IdParentezco,
-            Porcentaje = @Porcentaje
-        WHERE IdBeneficiario = @IdBeneficiario;
+        UPDATE b
+        SET b.IdParentezco = @IdParentezco,
+            b.Porcentaje = @Porcentaje
+        FROM dbo.Beneficiario AS b
+        WHERE b.IdBeneficiario = @IdBeneficiario;
 
-        UPDATE dbo.Persona
-        SET Nombre = @Nombre,
-            ValorDocumentoIdentidad = @ValorDocumentoIdentidad,
-            FechaNacimiento = @FechaNacimiento,
-            Email = @Email,
-            Telefono1 = @Telefono1,
-            Telefono2 = @Telefono2
-        FROM dbo.Persona
-        INNER JOIN dbo.Beneficiario
-            ON Persona.IdPersona = Beneficiario.IdPersona
-        WHERE Beneficiario.IdBeneficiario = @IdBeneficiario;
+        UPDATE p
+        SET p.Nombre = @Nombre,
+            p.ValorDocumentoIdentidad = @ValorDocumentoIdentidad,
+            p.FechaNacimiento = @FechaNacimiento,
+            p.Email = @Email,
+            p.Telefono1 = @Telefono1,
+            p.Telefono2 = @Telefono2
+        FROM dbo.Persona AS p
+        INNER JOIN dbo.Beneficiario AS b
+            ON p.IdPersona = b.IdPersona
+        WHERE b.IdBeneficiario = @IdBeneficiario;
 
         SELECT @JsonDespues =
         (
             SELECT
-                Beneficiario.IdBeneficiario,
-                Beneficiario.IdCuenta,
-                Beneficiario.IdPersona,
-                Beneficiario.IdParentezco,
-                Beneficiario.Porcentaje,
-                Persona.Nombre,
-                Persona.ValorDocumentoIdentidad,
-                Persona.FechaNacimiento,
-                Persona.Email,
-                Persona.Telefono1,
-                Persona.Telefono2
-            FROM dbo.Beneficiario
-            INNER JOIN dbo.Persona
-                ON Beneficiario.IdPersona = Persona.IdPersona
-            WHERE Beneficiario.IdBeneficiario = @IdBeneficiario
+                b.IdBeneficiario,
+                b.IdCuenta,
+                b.IdPersona,
+                b.IdParentezco,
+                b.Porcentaje,
+                p.Nombre,
+                p.ValorDocumentoIdentidad,
+                p.FechaNacimiento,
+                p.Email,
+                p.Telefono1,
+                p.Telefono2
+            FROM dbo.Beneficiario AS b
+            INNER JOIN dbo.Persona AS p
+                ON b.IdPersona = p.IdPersona
+            WHERE b.IdBeneficiario = @IdBeneficiario
             FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
         );
 
@@ -547,9 +542,9 @@ BEGIN
     IF NOT EXISTS
     (
         SELECT 1
-        FROM dbo.Beneficiario
-        WHERE IdBeneficiario = @IdBeneficiario
-          AND Activo = 1
+        FROM dbo.Beneficiario AS b
+        WHERE b.IdBeneficiario = @IdBeneficiario
+          AND b.Activo = 1
     )
     BEGIN
         RETURN 1;
@@ -565,28 +560,29 @@ BEGIN
         SELECT @JsonAntes =
         (
             SELECT
-                IdBeneficiario,
-                IdCuenta,
-                IdPersona,
-                Porcentaje
-            FROM dbo.Beneficiario
-            WHERE IdBeneficiario = @IdBeneficiario
+                b.IdBeneficiario,
+                b.IdCuenta,
+                b.IdPersona,
+                b.Porcentaje
+            FROM dbo.Beneficiario AS b
+            WHERE b.IdBeneficiario = @IdBeneficiario
             FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
         );
 
-        UPDATE dbo.Beneficiario
-        SET Porcentaje = @Porcentaje
-        WHERE IdBeneficiario = @IdBeneficiario;
+        UPDATE b
+        SET b.Porcentaje = @Porcentaje
+        FROM dbo.Beneficiario AS b
+        WHERE b.IdBeneficiario = @IdBeneficiario;
 
         SELECT @JsonDespues =
         (
             SELECT
-                IdBeneficiario,
-                IdCuenta,
-                IdPersona,
-                Porcentaje
-            FROM dbo.Beneficiario
-            WHERE IdBeneficiario = @IdBeneficiario
+                b.IdBeneficiario,
+                b.IdCuenta,
+                b.IdPersona,
+                b.Porcentaje
+            FROM dbo.Beneficiario AS b
+            WHERE b.IdBeneficiario = @IdBeneficiario
             FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
         );
 
@@ -637,9 +633,9 @@ BEGIN
     IF NOT EXISTS
     (
         SELECT 1
-        FROM dbo.Beneficiario
-        WHERE IdBeneficiario = @IdBeneficiario
-          AND Activo = 1
+        FROM dbo.Beneficiario AS b
+        WHERE b.IdBeneficiario = @IdBeneficiario
+          AND b.Activo = 1
     )
     BEGIN
         RETURN 1;
@@ -655,35 +651,36 @@ BEGIN
         SELECT @JsonAntes =
         (
             SELECT
-                IdBeneficiario,
-                IdCuenta,
-                IdPersona,
-                IdParentezco,
-                Porcentaje,
-                Activo,
-                FechaDesactivacion
-            FROM dbo.Beneficiario
-            WHERE IdBeneficiario = @IdBeneficiario
+                b.IdBeneficiario,
+                b.IdCuenta,
+                b.IdPersona,
+                b.IdParentezco,
+                b.Porcentaje,
+                b.Activo,
+                b.FechaDesactivacion
+            FROM dbo.Beneficiario AS b
+            WHERE b.IdBeneficiario = @IdBeneficiario
             FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
         );
 
-        UPDATE dbo.Beneficiario
-        SET Activo = 0,
-            FechaDesactivacion = CAST(GETDATE() AS DATE)
-        WHERE IdBeneficiario = @IdBeneficiario;
+        UPDATE b
+        SET b.Activo = 0,
+            b.FechaDesactivacion = CAST(GETDATE() AS DATE)
+        FROM dbo.Beneficiario AS b
+        WHERE b.IdBeneficiario = @IdBeneficiario;
 
         SELECT @JsonDespues =
         (
             SELECT
-                IdBeneficiario,
-                IdCuenta,
-                IdPersona,
-                IdParentezco,
-                Porcentaje,
-                Activo,
-                FechaDesactivacion
-            FROM dbo.Beneficiario
-            WHERE IdBeneficiario = @IdBeneficiario
+                b.IdBeneficiario,
+                b.IdCuenta,
+                b.IdPersona,
+                b.IdParentezco,
+                b.Porcentaje,
+                b.Activo,
+                b.FechaDesactivacion
+            FROM dbo.Beneficiario AS b
+            WHERE b.IdBeneficiario = @IdBeneficiario
             FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
         );
 
@@ -712,28 +709,29 @@ BEGIN
 END;
 GO
 
+
 -- ============================================================
 -- 13. Obtener tipo de documentos de identidad
 -- ============================================================
 
-
-CREATE OR ALTER   PROCEDURE dbo.sp_ObtenerTiposDocumento
+CREATE OR ALTER PROCEDURE dbo.sp_ObtenerTiposDocumento
 AS
 BEGIN
     SET NOCOUNT ON;
 
     SELECT
-        Id,
-        Nombre
-    FROM dbo.TipoDocuIdentidad;
+        td.Id,
+        td.Nombre
+    FROM dbo.TipoDocuIdentidad AS td;
 END;
 GO
+
 
 -- ============================================================
 -- 14. Obtener beneficiario por id
 -- ============================================================
 
-CREATE OR ALTER  PROCEDURE [dbo].[sp_ObtenerBeneficiarioPorId]
+CREATE OR ALTER PROCEDURE dbo.sp_ObtenerBeneficiarioPorId
     @IdBeneficiario INT,
     @IdCuenta INT
 AS
@@ -741,23 +739,23 @@ BEGIN
     SET NOCOUNT ON;
 
     SELECT
-        Beneficiario.IdBeneficiario,
-        Beneficiario.IdCuenta,
-        Beneficiario.IdPersona,
-        Persona.IdTipoDocuIdentidad,
-        Persona.ValorDocumentoIdentidad,
-        Persona.Nombre,
-        Persona.FechaNacimiento,
-        Persona.Email,
-        Persona.Telefono1,
-        Persona.Telefono2,
-        Beneficiario.IdParentezco,
-        Beneficiario.Porcentaje
-    FROM dbo.Beneficiario
-    INNER JOIN dbo.Persona
-        ON Beneficiario.IdPersona = Persona.IdPersona
-    WHERE Beneficiario.IdBeneficiario = @IdBeneficiario
-      AND Beneficiario.IdCuenta = @IdCuenta
-      AND Beneficiario.Activo = 1;
+        b.IdBeneficiario,
+        b.IdCuenta,
+        b.IdPersona,
+        p.IdTipoDocuIdentidad,
+        p.ValorDocumentoIdentidad,
+        p.Nombre,
+        p.FechaNacimiento,
+        p.Email,
+        p.Telefono1,
+        p.Telefono2,
+        b.IdParentezco,
+        b.Porcentaje
+    FROM dbo.Beneficiario AS b
+    INNER JOIN dbo.Persona AS p
+        ON b.IdPersona = p.IdPersona
+    WHERE b.IdBeneficiario = @IdBeneficiario
+      AND b.IdCuenta = @IdCuenta
+      AND b.Activo = 1;
 END;
 GO
