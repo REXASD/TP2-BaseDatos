@@ -1,21 +1,4 @@
-/* 
-===================================================================
-Estándar E31: Ejemplo ejecutable para pruebas del SP
-===================================================================
-DECLARE @xml XML = N'<Operaciones>
-    <FechaOperacion Fecha="2026-03-01">
-        <Movimiento Cuenta="1020039" TipoMov="Compra" Monto="2550.00" Descripcion="Walmart"/>
-    </FechaOperacion>
-</Operaciones>';
-DECLARE @outResult INT;
 
-EXEC dbo.sp_CargarOperacionesXML 
-    @inXml = @xml, 
-    @outResult = @outResult OUTPUT;
-
-SELECT @outResult AS CodigoResultado;
-===================================================================
-*/
 
 CREATE OR ALTER PROCEDURE dbo.sp_CargarOperacionesXML
     @inXml XML,
@@ -25,38 +8,38 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    -- a) Declaración de constantes
+ 
     DECLARE @true BIT = 1,
             @false BIT = 0;
 
-    -- b) Declaración de variables generales
+
     DECLARE @Hash VARCHAR(256);
     DECLARE @IdCarga INT;
     DECLARE @Min DATE;
     DECLARE @Max DATE;
     DECLARE @FechaActual DATE;
 
-    -- c) Tabla variable en RAM para fechas (Sustituye el estatuto WITH/CTE)
+    
     DECLARE @FechasGeneradas TABLE (
         Fecha DATE PRIMARY KEY
     );
 
     BEGIN TRY
-        -- d) Preprocesamiento fuera de la transacción
+        -- Preprocesamiento fuera de la transacción
         SET @Hash = CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', CONVERT(VARBINARY(MAX), @inXml)), 2);
 
-        -- Validar si el archivo ya fue cargado previamente
+        
         SELECT @IdCarga = c.IdCarga 
         FROM dbo.CargaOperacionesXML c 
         WHERE c.HashArchivo = @Hash;
 
         IF @IdCarga IS NOT NULL
         BEGIN
-            SET @outResult = 0; -- Código 0: Ya procesado
+            SET @outResult = 0; 
             RETURN 0;
         END;
 
-        -- Extraer rango de fechas del XML
+       
         SELECT 
             @Min = MIN(F.c.value('@Fecha', 'DATE'))
             , @Max = MAX(F.c.value('@Fecha', 'DATE'))
@@ -68,7 +51,7 @@ BEGIN
             RETURN 50001;
         END;
 
-        -- Generar el rango de fechas iterativamente en memoria (sin usar CTE)
+        
         SET @FechaActual = @Min;
         WHILE @FechaActual <= @Max
         BEGIN
@@ -76,7 +59,6 @@ BEGIN
             SET @FechaActual = DATEADD(DAY, 1, @FechaActual);
         END;
 
-        -- e) Transacción de BD atómica al final
         BEGIN TRANSACTION;
 
             INSERT INTO dbo.CargaOperacionesXML (
