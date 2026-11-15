@@ -230,3 +230,68 @@ h1, h2 {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* Consulta de estados de cuenta y movimientos */
+.enlace-detalle {
+    color: #1d4ed8;
+    font-weight: 600;
+    text-decoration: none;
+}
+.enlace-detalle span {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 400;
+    text-decoration: underline;
+}
+.fila-clic { cursor: pointer; }
+.fila-clic:hover td, .fila-clic:focus-within td { background-color: #eff6ff; }
+.enlace-detalle:focus-visible, .ruta-estado a:focus-visible {
+    outline: 3px solid #93c5fd;
+    outline-offset: 3px;
+}
+.ruta-estado {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+    color: #6b7280;
+    font-size: 14px;
+}
+.ruta-estado a { color: #1d4ed8; }
+.etiqueta-cuenta { margin: 0 0 8px; color: #4b5563; font-size: 14px; }
+.detalle-estado h1 { margin-bottom: 8px; }
+.periodo-estado { margin: 0; color: #4b5563; }
+.estado-acciones { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+.moneda-estado { margin: 0 0 16px; color: #4b5563; font-size: 14px; }
+.resumen-estado { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.tarjeta-estado { padding: 18px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; }
+.tarjeta-estado > span, .tarjeta-operaciones > span { display: block; color: #4b5563; font-size: 14px; }
+.tarjeta-estado strong { display: block; margin-top: 10px; font-size: 22px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tarjeta-saldo-final { background: #eff6ff; border-color: #bfdbfe; }
+.tarjeta-saldo-final strong { color: #1d4ed8; }
+.operaciones-estado { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+.tarjeta-operaciones { padding: 16px 18px; border: 1px solid #e5e7eb; border-radius: 8px; }
+.tarjeta-operaciones strong { display: block; margin: 8px 0; font-size: 26px; }
+.tarjeta-operaciones small { color: #6b7280; }
+.seccion-movimientos { margin-top: 32px; }
+.encabezado-movimientos { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.encabezado-movimientos h2 { font-size: 22px; margin-bottom: 6px; }
+.encabezado-movimientos p { margin: 0; color: #6b7280; font-size: 14px; }
+.total-movimientos { font-size: 14px; color: #4b5563; }
+.tabla-cuentas td.num, .tabla-cuentas th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tabla-movimientos .tipo-movimiento { min-width: 140px; white-space: normal; }
+.tabla-movimientos .descripcion-movimiento { min-width: 220px; white-space: normal; overflow-wrap: anywhere; }
+.tabla-movimientos td.num { min-width: 125px; }
+.hora-movimiento { display: block; margin-top: 4px; color: #6b7280; font-size: 12px; }
+.mov-credito { color: #047857; font-weight: 600; }
+.mov-debito { color: #b91c1c; font-weight: 600; }
+.sin-movimientos { padding: 24px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; color: #4b5563; }
+@media (max-width: 1050px) {
+    .resumen-estado { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 650px) {
+    .resumen-estado, .operaciones-estado { grid-template-columns: 1fr; }
+    .detalle-estado { padding: 18px; }
+    .estado-acciones { width: 100%; justify-content: space-between; }
+}

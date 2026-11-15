@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalle del estado de cuenta - {{ estado.NumeroCuenta }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/estilos.css', v=12) }}">
+</head>
+<body>
+    <main class="container container-wide detalle-estado">
+        <nav class="ruta-estado" aria-label="Ubicación">
+            <a href="{{ url_for('inicio') }}">Inicio</a><span>/</span>
+            <a href="{{ url_for('estados_cuenta', id_cuenta=id_cuenta) }}">Estados de cuenta</a><span>/</span>
+            <span>Detalle</span>
+        </nav>
+        <header class="header-bar">
+            <div>
+                <p class="etiqueta-cuenta">Cuenta #{{ estado.NumeroCuenta }}</p>
+                <h1>Estado de cuenta</h1>
+                <p class="periodo-estado">{{ estado.FechaInicio.strftime('%d/%m/%Y') }} al {{ estado.FechaFin.strftime('%d/%m/%Y') }}</p>
+            </div>
+            <div class="estado-acciones">
+                {% if estado.Cerrado %}<span class="badge badge-success">Cerrado</span>
+                {% else %}<span class="badge badge-warning">Abierto</span>{% endif %}
+                <a href="{{ url_for('estados_cuenta', id_cuenta=id_cuenta) }}" class="btn btn-secondary">Volver a estados</a>
+            </div>
+        </header>
+
+        <p class="moneda-estado">Importes en {{ estado.Moneda }} ({{ estado.Simbolo }}).</p>
+        <section class="resumen-estado" aria-label="Saldos del periodo">
+            <div class="tarjeta-estado"><span>Saldo inicial</span><strong>{{ estado.Simbolo }} {{ '{:,.2f}'.format(estado.SaldoInicial) }}</strong></div>
+            <div class="tarjeta-estado"><span>Saldo mínimo</span><strong>{{ estado.Simbolo }} {{ '{:,.2f}'.format(estado.SaldoMinimo) }}</strong></div>
+            <div class="tarjeta-estado tarjeta-saldo-final"><span>Saldo final</span><strong>{{ estado.Simbolo }} {{ '{:,.2f}'.format(estado.SaldoFinal) }}</strong></div>
+            <div class="tarjeta-estado"><span>Intereses acumulados</span><strong>{{ estado.Simbolo }} {{ '{:,.2f}'.format(estado.InteresesAcumulados) }}</strong></div>
+        </section>
+        <section class="operaciones-estado" aria-label="Operaciones del periodo">
+            <div class="tarjeta-operaciones"><span>Operaciones ATM</span><strong>{{ estado.CantidadOperacionesATM }}</strong><small>{{ estado.CantidadDepositosATM }} depósitos · {{ estado.CantidadRetirosATM }} retiros</small></div>
+            <div class="tarjeta-operaciones"><span>Operaciones en ventanilla</span><strong>{{ estado.CantidadOperacionesHumano }}</strong><small>{{ estado.CantidadDepositosHumano }} depósitos · {{ estado.CantidadRetirosHumano }} retiros</small></div>
+            <div class="tarjeta-operaciones"><span>Operaciones SINPE</span><strong>{{ estado.CantidadOperacionesSinpe }}</strong><small>{{ estado.CantidadSinpeEntrantes }} entrantes · {{ estado.CantidadSinpeSalientes }} salientes</small></div>
+        </section>
+
+        <section class="seccion-movimientos" aria-labelledby="titulo-movimientos">
+            <div class="encabezado-movimientos">
+                <div><h2 id="titulo-movimientos">Movimientos del periodo</h2><p>Ordenados del más antiguo al más reciente.</p></div>
+                <span class="total-movimientos">{{ movimientos|length }} movimiento{{ '' if movimientos|length == 1 else 's' }}</span>
+            </div>
+            {% if movimientos %}
+            <div class="table-responsive">
+                <table class="tabla-cuentas tabla-movimientos">
+                    <thead><tr><th scope="col">Fecha y hora</th><th scope="col">Tipo</th><th scope="col">Descripción</th><th scope="col" class="num">Monto ({{ estado.Simbolo }})</th><th scope="col" class="num">Nuevo saldo ({{ estado.Simbolo }})</th></tr></thead>
+                    <tbody>
+                        {% for m in movimientos %}
+                        <tr>
+                            <td>{{ m.Fecha.strftime('%d/%m/%Y') }}<span class="hora-movimiento">{{ m.Fecha.strftime('%H:%M:%S') }}</span></td>
+                            <td class="tipo-movimiento">{{ m.TipoMovimiento }}</td>
+                            <td class="descripcion-movimiento">{{ m.Descripcion }}</td>
+                            <td class="num {{ 'mov-credito' if m.Efecto == 1 else 'mov-debito' }}">{{ '+' if m.Efecto == 1 else '−' }} {{ '{:,.2f}'.format(m.Monto) }}</td>
+                            <td class="num">{{ '{:,.2f}'.format(m.NuevoSaldo) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="sin-movimientos">Este estado de cuenta no tiene movimientos registrados.</p>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Estados de Cuenta - Cuenta {{ numero_cuenta }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles/estilos.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/estilos.css', v=12) }}">
 </head>
 <body>
 
@@ -34,9 +34,8 @@
                 </thead>
                 <tbody>
                     {% for e in estados %}
-                    {# TP3: aquí se enlazará al detalle de movimientos del mes. #}
-                    <tr class="fila-clic" tabindex="0">
-                        <td>{{ e.FechaFin.strftime('%d/%m/%Y') }}</td>
+                    <tr class="fila-clic" data-url="{{ url_for('detalle_estado_cuenta', id_cuenta=id_cuenta, id_estado=e.IdEstadoCuenta) }}">
+                        <td><a class="enlace-detalle" href="{{ url_for('detalle_estado_cuenta', id_cuenta=id_cuenta, id_estado=e.IdEstadoCuenta) }}">{{ e.FechaFin.strftime('%d/%m/%Y') }}<span>Ver movimientos</span></a></td>
                         <td>{{ e.FechaInicio.strftime('%d/%m/%Y') }} – {{ e.FechaFin.strftime('%d/%m/%Y') }}</td>
                         <td class="num">{{ '{:,.2f}'.format(e.SaldoInicial) }}</td>
                         <td class="num">{{ '{:,.2f}'.format(e.SaldoFinal) }}</td>
@@ -56,5 +55,15 @@
         {% endif %}
     </div>
 
+    <script>
+        document.querySelectorAll('.fila-clic[data-url]').forEach(function (fila) {
+            fila.addEventListener('click', function (evento) {
+                if (evento.target.closest('a, button, input')) return;
+                const seleccion = window.getSelection();
+                if (seleccion && seleccion.toString()) return;
+                window.location.assign(fila.dataset.url);
+            });
+        });
+    </script>
 </body>
 </html>
