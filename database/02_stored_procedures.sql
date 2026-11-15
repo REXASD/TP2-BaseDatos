@@ -216,7 +216,7 @@ BEGIN
         @IdUsuario = @IdUsuario,
         @IdTipoOperacion = 7;
 
-    SELECT TOP 8
+    SELECT
         ec.IdEstadoCuenta,
         ec.FechaInicio,
         ec.FechaFin,

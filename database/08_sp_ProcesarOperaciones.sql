@@ -1,3 +1,11 @@
+/* Punto 10: lectura del XML real y reanudacion por operacion.
+   Cada operacion confirma sus cambios y flag_procesada juntos. Si una
+   falla, las PK anteriores permanecen procesadas; se retoma la primera
+   pendiente. Los cierres se confirman por cuenta con el SP del punto 9.
+   La fecha solo se marca al finalizar operaciones y cierres. El candado
+   de sesion impide ejecutar dos simulaciones a la vez, incluyendo la
+   llamada directa a sp_ProcesarFechaOperacion. Ejecutar sin BEGIN TRAN.
+*/
 CREATE OR ALTER PROCEDURE dbo.sp_ProcesarFechaOperacion
     @inFecha DATE,
     @outResult INT OUTPUT
@@ -27,14 +35,25 @@ BEGIN
             @User VARCHAR(64);
     DECLARE @Tipo VARCHAR(128), 
             @Monto DECIMAL(18,2), 
-            @Descripcion VARCHAR(256);
+            @Descripcion VARCHAR(255);
     DECLARE @FechaMov DATETIME, 
             @Saldo DECIMAL(18,2);
-    DECLARE @Mensaje VARCHAR(256);
+    DECLARE @Mensaje VARCHAR(MAX);
+    DECLARE @Candado INT, @TieneCandado BIT = 0;
 
     SET @outResult = 50000;
 
+    IF @@TRANCOUNT <> 0
+        THROW 50400, 'Ejecute la simulacion sin una transaccion externa.', 1;
+
     BEGIN TRY
+        EXEC @Candado = sys.sp_getapplock
+            @Resource = 'sp_ProcesarSimulacion', @LockMode = 'Exclusive',
+            @LockOwner = 'Session', @LockTimeout = 0;
+        IF @Candado < 0
+            THROW 50420, 'Ya hay un proceso de simulacion en ejecucion.', 1;
+        SET @TieneCandado = 1;
+
         -- Validar existencia y estado de la fecha
         SELECT @Procesada = flag_procesada
         FROM dbo.ControlFechaOperacion
@@ -45,6 +64,9 @@ BEGIN
 
         IF @Procesada = @true
         BEGIN
+            EXEC sys.sp_releaseapplock
+                @Resource = 'sp_ProcesarSimulacion', @LockOwner = 'Session';
+            SET @TieneCandado = 0;
             SET @outResult = 0;
             RETURN 0;
         END;
@@ -65,8 +87,6 @@ BEGIN
         SET @FechaMov = CONVERT(DATETIME, @inFecha);
 
 
-        BEGIN TRANSACTION;
-
         WHILE 1 = 1
         BEGIN
             SET @IdOp = NULL;
@@ -82,12 +102,14 @@ BEGIN
 
             IF @IdOp IS NULL BREAK;
 
-            IF @Nodo = 'Movimiento' OR @Nodo = 'Movimientos'
+            BEGIN TRANSACTION;
+
+            IF @Nodo = 'Movimientos'
             BEGIN
-                SET @NumeroCuenta = ISNULL(@Datos.value('(@NumeroCuenta)[1]', 'VARCHAR(32)'), @Datos.value('(@CodigoCuenta)[1]', 'VARCHAR(32)'));
-                SET @Tipo         = ISNULL(@Datos.value('(@TipoMov)[1]', 'VARCHAR(128)'), @Datos.value('(@TipoMovimiento)[1]', 'VARCHAR(128)'));
-                SET @Monto        = @Datos.value('(@Monto)[1]', 'DECIMAL(18,2)');
-                SET @Descripcion  = ISNULL(@Datos.value('(@Descripcion)[1]', 'VARCHAR(256)'), '');
+                SET @NumeroCuenta = @Datos.value('(/*/@CodigoCuenta)[1]', 'VARCHAR(32)');
+                SET @Tipo         = @Datos.value('(/*/@Tipo)[1]', 'VARCHAR(128)');
+                SET @Monto        = @Datos.value('(/*/@Monto)[1]', 'DECIMAL(18,2)');
+                SET @Descripcion  = ISNULL(@Datos.value('(/*/@Descripcion)[1]', 'VARCHAR(255)'), '');
 
                 SET @IdTipo = NULL;
                 SELECT @IdTipo = Id 
@@ -111,8 +133,8 @@ BEGIN
             END
             ELSE IF @Nodo = 'Persona'
             BEGIN
-                SET @Doc = ISNULL(@Datos.value('(@ValorDocumentoIdentidad)[1]', 'VARCHAR(64)'),
-                                  @Datos.value('(@ValorDocumentoIdentidadDelCliente)[1]', 'VARCHAR(64)'));
+                SET @Doc = ISNULL(@Datos.value('(/*/@ValorDocumentoIdentidad)[1]', 'VARCHAR(64)'),
+                                  @Datos.value('(/*/@ValorDocumentoIdentidadDelCliente)[1]', 'VARCHAR(64)'));
 
                 IF NOT EXISTS (SELECT 1 FROM dbo.Persona WHERE ValorDocumentoIdentidad = @Doc)
                     INSERT INTO dbo.Persona (
@@ -125,21 +147,21 @@ BEGIN
                         , Telefono2
                     )
                     VALUES (
-                        @Datos.value('(@TipoDocuIdentidad)[1]', 'INT')
+                        @Datos.value('(/*/@TipoDocuIdentidad)[1]', 'INT')
                         , @Doc
-                        , @Datos.value('(@Nombre)[1]', 'VARCHAR(128)')
-                        , @Datos.value('(@FechaNacimiento)[1]', 'DATE')
-                        , ISNULL(@Datos.value('(@Email)[1]', 'VARCHAR(128)'), '')
-                        , ISNULL(@Datos.value('(@Telefono1)[1]', 'VARCHAR(32)'), '')
-                        , ISNULL(@Datos.value('(@Telefono2)[1]', 'VARCHAR(32)'), '')
+                        , @Datos.value('(/*/@Nombre)[1]', 'VARCHAR(64)')
+                        , @Datos.value('(/*/@FechaNacimiento)[1]', 'DATE')
+                        , ISNULL(@Datos.value('(/*/@Email)[1]', 'VARCHAR(100)'), '')
+                        , ISNULL(@Datos.value('(/*/@telefono1)[1]', 'VARCHAR(20)'), '')
+                        , ISNULL(@Datos.value('(/*/@telefono2)[1]', 'VARCHAR(20)'), '')
                     );
             END
             ELSE IF @Nodo = 'Cuenta'
             BEGIN
-                SET @Doc          = ISNULL(@Datos.value('(@ValorDocumentoIdentidadDelCliente)[1]', 'VARCHAR(64)'),
-                                            @Datos.value('(@ValorDocumentoIdentidad)[1]', 'VARCHAR(64)'));
-                SET @NumeroCuenta = @Datos.value('(@NumeroCuenta)[1]', 'VARCHAR(32)');
-                SET @Saldo        = ISNULL(@Datos.value('(@Saldo)[1]', 'DECIMAL(18,2)'), 0);
+                SET @Doc          = ISNULL(@Datos.value('(/*/@ValorDocumentoIdentidadDelCliente)[1]', 'VARCHAR(64)'),
+                                            @Datos.value('(/*/@ValorDocumentoIdentidad)[1]', 'VARCHAR(64)'));
+                SET @NumeroCuenta = @Datos.value('(/*/@NumeroCuenta)[1]', 'VARCHAR(32)');
+                SET @Saldo        = ISNULL(@Datos.value('(/*/@Saldo)[1]', 'DECIMAL(18,2)'), 0);
 
                 SET @IdPersona = NULL;
                 SELECT @IdPersona = IdPersona 
@@ -163,16 +185,16 @@ BEGIN
                     VALUES (
                         @NumeroCuenta
                         , @IdPersona
-                        , @Datos.value('(@IdTipoCuenta)[1]', 'INT')
-                        , @Datos.value('(@FechaCreacion)[1]', 'DATE')
+                        , @Datos.value('(/*/@TipoCuentaId)[1]', 'INT')
+                        , @Datos.value('(/*/@FechaCreacion)[1]', 'DATE')
                         , 0
                     );
             END
             ELSE IF @Nodo = 'Beneficiario'
             BEGIN
-                SET @NumeroCuenta = @Datos.value('(@NumeroCuenta)[1]', 'VARCHAR(32)');
-                SET @Doc          = ISNULL(@Datos.value('(@ValorDocumentoIdentidadBeneficiario)[1]', 'VARCHAR(64)'),
-                                            @Datos.value('(@ValorDocumentoIdentidad)[1]', 'VARCHAR(64)'));
+                SET @NumeroCuenta = @Datos.value('(/*/@NumeroCuenta)[1]', 'VARCHAR(32)');
+                SET @Doc          = ISNULL(@Datos.value('(/*/@ValorDocumentoIdentidadBeneficiario)[1]', 'VARCHAR(64)'),
+                                            @Datos.value('(/*/@ValorDocumentoIdentidad)[1]', 'VARCHAR(64)'));
 
                 SET @IdCuenta  = NULL; 
                 SET @IdPersona = NULL;
@@ -201,16 +223,16 @@ BEGIN
                     VALUES (
                         @IdCuenta
                         , @IdPersona
-                        , @Datos.value('(@IdParentezco)[1]', 'INT')
-                        , @Datos.value('(@Porcentaje)[1]', 'INT')
+                        , @Datos.value('(/*/@IdParentezco)[1]', 'INT')
+                        , @Datos.value('(/*/@Porcentaje)[1]', 'INT')
                         , @true
                         , NULL
                     );
             END
             ELSE IF @Nodo = 'Usuario'
             BEGIN
-                SET @User = ISNULL(@Datos.value('(@User)[1]', 'VARCHAR(64)'), @Datos.value('(@NombreUsuario)[1]', 'VARCHAR(64)'));
-                SET @Doc  = @Datos.value('(@ValorDocId)[1]', 'VARCHAR(64)');
+                SET @User = ISNULL(@Datos.value('(/*/@User)[1]', 'VARCHAR(64)'), @Datos.value('(/*/@NombreUsuario)[1]', 'VARCHAR(64)'));
+                SET @Doc  = @Datos.value('(/*/@ValorDocId)[1]', 'VARCHAR(64)');
 
                 SET @IdPersona = NULL;
                 SELECT @IdPersona = IdPersona 
@@ -229,15 +251,15 @@ BEGIN
                     )
                     VALUES (
                         @User
-                        , @Datos.value('(@Pass)[1]', 'VARCHAR(128)')
-                        , @Datos.value('(@EsAdministrador)[1]', 'BIT')
+                        , @Datos.value('(/*/@Pass)[1]', 'VARCHAR(255)')
+                        , @Datos.value('(/*/@EsAdministrador)[1]', 'BIT')
                         , @IdPersona
                     );
             END
             ELSE IF @Nodo = 'UsuarioPuedeVer'
             BEGIN
-                SET @User         = ISNULL(@Datos.value('(@User)[1]', 'VARCHAR(64)'), @Datos.value('(@NombreUsuario)[1]', 'VARCHAR(64)'));
-                SET @NumeroCuenta = @Datos.value('(@NumeroCuenta)[1]', 'VARCHAR(32)');
+                SET @User         = ISNULL(@Datos.value('(/*/@User)[1]', 'VARCHAR(64)'), @Datos.value('(/*/@NombreUsuario)[1]', 'VARCHAR(64)'));
+                SET @NumeroCuenta = @Datos.value('(/*/@NumeroCuenta)[1]', 'VARCHAR(32)');
 
                 SET @IdUsuario = NULL; 
                 SET @IdCuenta  = NULL;
@@ -269,6 +291,8 @@ BEGIN
             UPDATE dbo.OperacionXML 
             SET flag_procesada = @true 
             WHERE IdOperacionXML = @IdOp;
+
+            COMMIT TRANSACTION;
         END;
 
         -- Proceso de cierre de estados de cuenta
@@ -308,7 +332,9 @@ BEGIN
             UltimoError = NULL
         WHERE Fecha = @inFecha;
 
-        COMMIT TRANSACTION;
+        EXEC sys.sp_releaseapplock
+            @Resource = 'sp_ProcesarSimulacion', @LockOwner = 'Session';
+        SET @TieneCandado = 0;
 
         SET @outResult = 0;
         RETURN 0;
@@ -321,10 +347,15 @@ BEGIN
         IF XACT_STATE() <> 0
             ROLLBACK TRANSACTION;
 
-        UPDATE dbo.ControlFechaOperacion
-        SET UltimoError = @Mensaje
-        WHERE Fecha = @inFecha 
-          AND flag_procesada = @false;
+        IF @TieneCandado = 1
+            EXEC sys.sp_releaseapplock
+                @Resource = 'sp_ProcesarSimulacion', @LockOwner = 'Session';
+
+        IF @TieneCandado = 1
+            UPDATE dbo.ControlFechaOperacion
+            SET UltimoError = @Mensaje
+            WHERE Fecha = @inFecha
+              AND flag_procesada = @false;
 
         THROW;
     END CATCH;
@@ -352,7 +383,10 @@ BEGIN
 
     SET @outResult = 50000;
 
-    EXEC @Candado = sp_getapplock
+    IF @@TRANCOUNT <> 0
+        THROW 50400, 'Ejecute la simulacion sin una transaccion externa.', 1;
+
+    EXEC @Candado = sys.sp_getapplock
         @Resource   = 'sp_ProcesarSimulacion', 
         @LockMode   = 'Exclusive',
         @LockOwner  = 'Session', 
@@ -384,7 +418,7 @@ BEGIN
             SET @Procesadas = @Procesadas + 1;
         END;
 
-        EXEC sp_releaseapplock 
+        EXEC sys.sp_releaseapplock 
             @Resource  = 'sp_ProcesarSimulacion', 
             @LockOwner = 'Session';
 
@@ -394,7 +428,7 @@ BEGIN
     BEGIN CATCH
         SET @outResult = ERROR_NUMBER();
         
-        EXEC sp_releaseapplock 
+        EXEC sys.sp_releaseapplock 
             @Resource  = 'sp_ProcesarSimulacion', 
             @LockOwner = 'Session';
             

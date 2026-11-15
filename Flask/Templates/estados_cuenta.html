@@ -15,7 +15,7 @@
         </header>
 
         {% if estados %}
-        <p>Últimos {{ estados|length }} estados de cuenta, del más reciente al menos reciente.</p>
+        <p>{{ estados|length }} estados de cuenta, ordenados del más reciente al más antiguo.</p>
         <div class="table-responsive">
             <table class="tabla-cuentas tabla-estados">
                 <thead>
