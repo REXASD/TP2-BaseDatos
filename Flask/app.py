@@ -42,7 +42,7 @@ def obtener_conexion():
             g.conexion = pytds.connect(
                 server=os.environ['DB_SERVER'], database=os.environ['DB_NAME'],
                 user=os.environ['DB_USER'], password=os.environ['DB_PASSWORD'],
-                port=1433, autocommit=True, login_timeout=10, timeout=15,
+                port=1433, autocommit=True, login_timeout=30, timeout=15,
                 cafile=certifi.where(), validate_host=True, enc_login_only=False,
                 disable_connect_retry=True, appname='TP2-BaseDatos',
             )
@@ -167,7 +167,7 @@ def sin_permiso(error):
 
 @app.errorhandler(404)
 def no_encontrado(error):
-    return render_template('error.html', mensaje='La página o el beneficiario no existe.'), 404
+    return render_template('error.html', mensaje='La página o el registro solicitado no existe.'), 404
 
 
 @app.errorhandler(pytds.Error)
@@ -373,6 +373,24 @@ def estados_cuenta(id_cuenta):
                            IdUsuario=session['id_usuario'], IdCuenta=id_cuenta)
     return render_template('estados_cuenta.html', estados=estados,
                            id_cuenta=id_cuenta, numero_cuenta=cuenta['NumeroCuenta'])
+
+
+@app.route('/cuenta/<int:id_cuenta>/estados/<int:id_estado>')
+def detalle_estado_cuenta(id_cuenta, id_estado):
+    obtener_cuenta_autorizada(id_cuenta)
+    resultado, conjuntos = ejecutar_sp('sp_ObtenerDetalleEstadoCuenta', {
+        'IdUsuario': session['id_usuario'], 'IdCuenta': id_cuenta,
+        'IdEstadoCuenta': id_estado, 'IP': ip_cliente(),
+    })
+    if resultado == 2:
+        abort(403)
+    if resultado == 1:
+        abort(404)
+    if resultado != 0 or len(conjuntos) != 2 or len(conjuntos[0]) != 1:
+        abort(500)
+    return render_template('detalle_estado_cuenta.html',
+                           estado=conjuntos[0][0], movimientos=conjuntos[1],
+                           id_cuenta=id_cuenta)
 
 
 @app.route('/logout', methods=['POST'])
