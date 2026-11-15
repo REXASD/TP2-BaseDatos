@@ -167,6 +167,14 @@ BEGIN
             END;
         END;
 
+
+        DECLARE @EsPrimerMovimiento BIT = 0;
+        IF NOT EXISTS (SELECT 1 FROM dbo.Movimiento WHERE IdEstadoCuenta = @IdEstadoCuenta)
+           AND EXISTS (SELECT 1 FROM dbo.EstadoDeCuenta AS e
+                       INNER JOIN dbo.Cuenta AS c ON c.IdCuenta = e.IdCuenta
+                       WHERE e.IdEstadoCuenta = @IdEstadoCuenta AND e.FechaInicio = c.FechaCreacion)
+            SET @EsPrimerMovimiento = 1;
+
         -- Primero se guarda el saldo posterior al movimiento principal.
         SET @NuevoSaldo = @Saldo + (@inMonto * @Efecto);
 
@@ -202,7 +210,7 @@ BEGIN
 
         UPDATE dbo.EstadoDeCuenta
         SET SaldoFinal = @NuevoSaldo,
-            SaldoMinimo = CASE WHEN @NuevoSaldo < SaldoMinimo THEN @NuevoSaldo ELSE SaldoMinimo END,
+            SaldoMinimo = CASE WHEN @EsPrimerMovimiento = 1 OR @NuevoSaldo < SaldoMinimo THEN @NuevoSaldo ELSE SaldoMinimo END,
             CantidadRetiros = CantidadRetiros + CASE WHEN @NombreTipo IN ('Retiro ATM', 'Retiro Ventana') THEN 1 ELSE 0 END,
             CantidadDepositos = CantidadDepositos + CASE WHEN @NombreTipo IN ('Deposito ATM', 'Deposito Ventana') THEN 1 ELSE 0 END,
             CantidadRetirosATM = CantidadRetirosATM + CASE WHEN @NombreTipo = 'Retiro ATM' THEN 1 ELSE 0 END,
