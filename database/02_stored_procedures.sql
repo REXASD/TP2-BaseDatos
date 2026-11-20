@@ -245,6 +245,11 @@ GO
 -- 3 = Error
 -- ============================================================
 
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
 CREATE OR ALTER PROCEDURE dbo.sp_InsertarBeneficiario
     @IdUsuario INT,
     @IdCuenta INT,
@@ -260,64 +265,64 @@ CREATE OR ALTER PROCEDURE dbo.sp_InsertarBeneficiario
 AS
 BEGIN
     SET NOCOUNT ON;
-
-    IF @Porcentaje < 0 OR @Porcentaje > 100
-    BEGIN
-        RETURN 2;
-    END
-
-    DECLARE @CantidadBeneficiarios INT;
-
-    SELECT @CantidadBeneficiarios = COUNT(*)
-    FROM dbo.Beneficiario AS b
-    WHERE b.IdCuenta = @IdCuenta
-      AND b.Activo = 1;
-
-    IF @CantidadBeneficiarios >= 3
-    BEGIN
-        RETURN 1;
-    END
+    SET XACT_ABORT ON;
 
     BEGIN TRY
-
-        BEGIN TRANSACTION;
-
+        DECLARE @TransaccionInicial INT = @@TRANCOUNT;
+        DECLARE @CantidadBeneficiarios INT;
         DECLARE @IdPersona INT;
+        DECLARE @IdBeneficiario INT;
+        DECLARE @flag_crearPersona BIT;
+        DECLARE @JsonDespues NVARCHAR(MAX);
+
+        IF @Porcentaje < 0 OR @Porcentaje > 100
+            RETURN 2;
+
+        SELECT @CantidadBeneficiarios = COUNT(1)
+        FROM dbo.Beneficiario AS b
+        WHERE b.IdCuenta = @IdCuenta
+          AND b.Activo = 1;
+
+        IF @CantidadBeneficiarios >= 3
+            RETURN 1;
 
         SELECT @IdPersona = p.IdPersona
         FROM dbo.Persona AS p
         WHERE p.ValorDocumentoIdentidad = @ValorDocumentoIdentidad;
 
-        IF @IdPersona IS NULL
-        BEGIN
+        SET @flag_crearPersona = CASE
+            WHEN @IdPersona IS NULL THEN 1
+            ELSE 0
+        END;
 
-            INSERT INTO dbo.Persona
-            (
-                IdTipoDocuIdentidad,
-                ValorDocumentoIdentidad,
-                Nombre,
-                FechaNacimiento,
-                Email,
-                Telefono1,
-                Telefono2
-            )
-            VALUES
-            (
-                @IdTipoDocuIdentidad,
-                @ValorDocumentoIdentidad,
-                @Nombre,
-                @FechaNacimiento,
-                @Email,
-                @Telefono1,
-                @Telefono2
-            );
+        IF @TransaccionInicial = 0
+            BEGIN TRANSACTION;
 
-            SET @IdPersona = SCOPE_IDENTITY();
+        INSERT INTO dbo.Persona (
+            IdTipoDocuIdentidad,
+            ValorDocumentoIdentidad,
+            Nombre,
+            FechaNacimiento,
+            Email,
+            Telefono1,
+            Telefono2
+        )
+        SELECT
+            @IdTipoDocuIdentidad,
+            @ValorDocumentoIdentidad,
+            @Nombre,
+            @FechaNacimiento,
+            @Email,
+            @Telefono1,
+            @Telefono2
+        WHERE @flag_crearPersona = 1;
 
-        END
+        SET @IdPersona = COALESCE(
+            @IdPersona,
+            CONVERT(INT, SCOPE_IDENTITY())
+        );
 
-        INSERT INTO dbo.Beneficiario
-        (
+        INSERT INTO dbo.Beneficiario (
             IdCuenta,
             IdParentezco,
             IdPersona,
@@ -325,8 +330,7 @@ BEGIN
             Activo,
             FechaDesactivacion
         )
-        VALUES
-        (
+        VALUES (
             @IdCuenta,
             @IdParentezco,
             @IdPersona,
@@ -335,14 +339,9 @@ BEGIN
             NULL
         );
 
-        DECLARE @IdBeneficiario INT;
+        SET @IdBeneficiario = CONVERT(INT, SCOPE_IDENTITY());
 
-        SET @IdBeneficiario = SCOPE_IDENTITY();
-
-        DECLARE @JsonDespues NVARCHAR(MAX);
-
-        SELECT @JsonDespues =
-        (
+        SELECT @JsonDespues = (
             SELECT
                 b.IdBeneficiario,
                 b.IdCuenta,
@@ -362,22 +361,17 @@ BEGIN
             @JsonAntes = NULL,
             @JsonDespues = @JsonDespues;
 
-        COMMIT TRANSACTION;
+        IF @TransaccionInicial = 0
+            COMMIT TRANSACTION;
 
         RETURN 0;
-
     END TRY
-
     BEGIN CATCH
-
         IF @@TRANCOUNT > 0
-        BEGIN
             ROLLBACK TRANSACTION;
-        END
 
         RETURN 3;
-
-    END CATCH
+    END CATCH;
 END;
 GO
 
@@ -391,6 +385,12 @@ GO
 -- 2 = Porcentaje invalido
 -- 3 = Error
 -- ============================================================
+
+
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
 
 CREATE OR ALTER PROCEDURE dbo.sp_ActualizarBeneficiario
     @IdUsuario INT,
@@ -406,32 +406,25 @@ CREATE OR ALTER PROCEDURE dbo.sp_ActualizarBeneficiario
 AS
 BEGIN
     SET NOCOUNT ON;
-
-    IF @Porcentaje < 0 OR @Porcentaje > 100
-    BEGIN
-        RETURN 2;
-    END
-
-    IF NOT EXISTS
-    (
-        SELECT 1
-        FROM dbo.Beneficiario AS b
-        WHERE b.IdBeneficiario = @IdBeneficiario
-          AND b.Activo = 1
-    )
-    BEGIN
-        RETURN 1;
-    END
+    SET XACT_ABORT ON;
 
     BEGIN TRY
-
-        BEGIN TRANSACTION;
-
+        DECLARE @TransaccionInicial INT = @@TRANCOUNT;
         DECLARE @JsonAntes NVARCHAR(MAX);
         DECLARE @JsonDespues NVARCHAR(MAX);
 
-        SELECT @JsonAntes =
-        (
+        IF @Porcentaje < 0 OR @Porcentaje > 100
+            RETURN 2;
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM dbo.Beneficiario AS b
+            WHERE b.IdBeneficiario = @IdBeneficiario
+              AND b.Activo = 1
+        )
+            RETURN 1;
+
+        SELECT @JsonAntes = (
             SELECT
                 b.IdBeneficiario,
                 b.IdCuenta,
@@ -446,49 +439,53 @@ BEGIN
                 p.Telefono2
             FROM dbo.Beneficiario AS b
             INNER JOIN dbo.Persona AS p
-                ON b.IdPersona = p.IdPersona
+                ON p.IdPersona = b.IdPersona
             WHERE b.IdBeneficiario = @IdBeneficiario
             FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
         );
 
+        SELECT @JsonDespues = (
+            SELECT
+                b.IdBeneficiario,
+                b.IdCuenta,
+                b.IdPersona,
+                @IdParentezco AS IdParentezco,
+                @Porcentaje AS Porcentaje,
+                @Nombre AS Nombre,
+                @ValorDocumentoIdentidad AS ValorDocumentoIdentidad,
+                @FechaNacimiento AS FechaNacimiento,
+                @Email AS Email,
+                @Telefono1 AS Telefono1,
+                @Telefono2 AS Telefono2
+            FROM dbo.Beneficiario AS b
+            INNER JOIN dbo.Persona AS p
+                ON p.IdPersona = b.IdPersona
+            WHERE b.IdBeneficiario = @IdBeneficiario
+            FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
+        );
+
+        IF @TransaccionInicial = 0
+            BEGIN TRANSACTION;
+
         UPDATE b
-        SET b.IdParentezco = @IdParentezco,
-            b.Porcentaje = @Porcentaje
+        SET
+            IdParentezco = @IdParentezco,
+            Porcentaje = @Porcentaje
         FROM dbo.Beneficiario AS b
         WHERE b.IdBeneficiario = @IdBeneficiario;
 
         UPDATE p
-        SET p.Nombre = @Nombre,
-            p.ValorDocumentoIdentidad = @ValorDocumentoIdentidad,
-            p.FechaNacimiento = @FechaNacimiento,
-            p.Email = @Email,
-            p.Telefono1 = @Telefono1,
-            p.Telefono2 = @Telefono2
+        SET
+            Nombre = @Nombre,
+            ValorDocumentoIdentidad = @ValorDocumentoIdentidad,
+            FechaNacimiento = @FechaNacimiento,
+            Email = @Email,
+            Telefono1 = @Telefono1,
+            Telefono2 = @Telefono2
         FROM dbo.Persona AS p
         INNER JOIN dbo.Beneficiario AS b
             ON p.IdPersona = b.IdPersona
         WHERE b.IdBeneficiario = @IdBeneficiario;
-
-        SELECT @JsonDespues =
-        (
-            SELECT
-                b.IdBeneficiario,
-                b.IdCuenta,
-                b.IdPersona,
-                b.IdParentezco,
-                b.Porcentaje,
-                p.Nombre,
-                p.ValorDocumentoIdentidad,
-                p.FechaNacimiento,
-                p.Email,
-                p.Telefono1,
-                p.Telefono2
-            FROM dbo.Beneficiario AS b
-            INNER JOIN dbo.Persona AS p
-                ON b.IdPersona = p.IdPersona
-            WHERE b.IdBeneficiario = @IdBeneficiario
-            FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
-        );
 
         EXEC dbo.sp_RegistrarBitacora
             @IdUsuario = @IdUsuario,
@@ -496,22 +493,17 @@ BEGIN
             @JsonAntes = @JsonAntes,
             @JsonDespues = @JsonDespues;
 
-        COMMIT TRANSACTION;
+        IF @TransaccionInicial = 0
+            COMMIT TRANSACTION;
 
         RETURN 0;
-
     END TRY
-
     BEGIN CATCH
-
         IF @@TRANCOUNT > 0
-        BEGIN
             ROLLBACK TRANSACTION;
-        END
 
         RETURN 3;
-
-    END CATCH
+    END CATCH;
 END;
 GO
 
@@ -526,6 +518,12 @@ GO
 -- 3 = Error
 -- ============================================================
 
+
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
 CREATE OR ALTER PROCEDURE dbo.sp_ActualizarPorcentajeBeneficiario
     @IdUsuario INT,
     @IdBeneficiario INT,
@@ -533,32 +531,25 @@ CREATE OR ALTER PROCEDURE dbo.sp_ActualizarPorcentajeBeneficiario
 AS
 BEGIN
     SET NOCOUNT ON;
-
-    IF @Porcentaje < 0 OR @Porcentaje > 100
-    BEGIN
-        RETURN 2;
-    END
-
-    IF NOT EXISTS
-    (
-        SELECT 1
-        FROM dbo.Beneficiario AS b
-        WHERE b.IdBeneficiario = @IdBeneficiario
-          AND b.Activo = 1
-    )
-    BEGIN
-        RETURN 1;
-    END
+    SET XACT_ABORT ON;
 
     BEGIN TRY
-
-        BEGIN TRANSACTION;
-
+        DECLARE @TransaccionInicial INT = @@TRANCOUNT;
         DECLARE @JsonAntes NVARCHAR(MAX);
         DECLARE @JsonDespues NVARCHAR(MAX);
 
-        SELECT @JsonAntes =
-        (
+        IF @Porcentaje < 0 OR @Porcentaje > 100
+            RETURN 2;
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM dbo.Beneficiario AS b
+            WHERE b.IdBeneficiario = @IdBeneficiario
+              AND b.Activo = 1
+        )
+            RETURN 1;
+
+        SELECT @JsonAntes = (
             SELECT
                 b.IdBeneficiario,
                 b.IdCuenta,
@@ -568,23 +559,25 @@ BEGIN
             WHERE b.IdBeneficiario = @IdBeneficiario
             FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
         );
+
+        SELECT @JsonDespues = (
+            SELECT
+                b.IdBeneficiario,
+                b.IdCuenta,
+                b.IdPersona,
+                @Porcentaje AS Porcentaje
+            FROM dbo.Beneficiario AS b
+            WHERE b.IdBeneficiario = @IdBeneficiario
+            FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
+        );
+
+        IF @TransaccionInicial = 0
+            BEGIN TRANSACTION;
 
         UPDATE b
-        SET b.Porcentaje = @Porcentaje
+        SET Porcentaje = @Porcentaje
         FROM dbo.Beneficiario AS b
         WHERE b.IdBeneficiario = @IdBeneficiario;
-
-        SELECT @JsonDespues =
-        (
-            SELECT
-                b.IdBeneficiario,
-                b.IdCuenta,
-                b.IdPersona,
-                b.Porcentaje
-            FROM dbo.Beneficiario AS b
-            WHERE b.IdBeneficiario = @IdBeneficiario
-            FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
-        );
 
         EXEC dbo.sp_RegistrarBitacora
             @IdUsuario = @IdUsuario,
@@ -592,24 +585,20 @@ BEGIN
             @JsonAntes = @JsonAntes,
             @JsonDespues = @JsonDespues;
 
-        COMMIT TRANSACTION;
+        IF @TransaccionInicial = 0
+            COMMIT TRANSACTION;
 
         RETURN 0;
-
     END TRY
-
     BEGIN CATCH
-
         IF @@TRANCOUNT > 0
-        BEGIN
             ROLLBACK TRANSACTION;
-        END
 
         RETURN 3;
-
-    END CATCH
+    END CATCH;
 END;
 GO
+
 
 
 -- ============================================================
@@ -623,33 +612,38 @@ GO
 -- 2 = Error
 -- ============================================================
 
+
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
 CREATE OR ALTER PROCEDURE dbo.sp_EliminarBeneficiario
     @IdUsuario INT,
     @IdBeneficiario INT
 AS
 BEGIN
     SET NOCOUNT ON;
-
-    IF NOT EXISTS
-    (
-        SELECT 1
-        FROM dbo.Beneficiario AS b
-        WHERE b.IdBeneficiario = @IdBeneficiario
-          AND b.Activo = 1
-    )
-    BEGIN
-        RETURN 1;
-    END
+    SET XACT_ABORT ON;
 
     BEGIN TRY
-
-        BEGIN TRANSACTION;
-
+        DECLARE @TransaccionInicial INT = @@TRANCOUNT;
         DECLARE @JsonAntes NVARCHAR(MAX);
         DECLARE @JsonDespues NVARCHAR(MAX);
+        DECLARE @FechaDesactivacion DATE;
+        DECLARE @flag_activo BIT = 0;
 
-        SELECT @JsonAntes =
-        (
+        IF NOT EXISTS (
+            SELECT 1
+            FROM dbo.Beneficiario AS b
+            WHERE b.IdBeneficiario = @IdBeneficiario
+              AND b.Activo = 1
+        )
+            RETURN 1;
+
+        SET @FechaDesactivacion = CAST(GETDATE() AS DATE);
+
+        SELECT @JsonAntes = (
             SELECT
                 b.IdBeneficiario,
                 b.IdCuenta,
@@ -662,27 +656,30 @@ BEGIN
             WHERE b.IdBeneficiario = @IdBeneficiario
             FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
         );
+
+        SELECT @JsonDespues = (
+            SELECT
+                b.IdBeneficiario,
+                b.IdCuenta,
+                b.IdPersona,
+                b.IdParentezco,
+                b.Porcentaje,
+                @flag_activo AS Activo,
+                @FechaDesactivacion AS FechaDesactivacion
+            FROM dbo.Beneficiario AS b
+            WHERE b.IdBeneficiario = @IdBeneficiario
+            FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
+        );
+
+        IF @TransaccionInicial = 0
+            BEGIN TRANSACTION;
 
         UPDATE b
-        SET b.Activo = 0,
-            b.FechaDesactivacion = CAST(GETDATE() AS DATE)
+        SET
+            Activo = @flag_activo,
+            FechaDesactivacion = @FechaDesactivacion
         FROM dbo.Beneficiario AS b
         WHERE b.IdBeneficiario = @IdBeneficiario;
-
-        SELECT @JsonDespues =
-        (
-            SELECT
-                b.IdBeneficiario,
-                b.IdCuenta,
-                b.IdPersona,
-                b.IdParentezco,
-                b.Porcentaje,
-                b.Activo,
-                b.FechaDesactivacion
-            FROM dbo.Beneficiario AS b
-            WHERE b.IdBeneficiario = @IdBeneficiario
-            FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
-        );
 
         EXEC dbo.sp_RegistrarBitacora
             @IdUsuario = @IdUsuario,
@@ -690,24 +687,20 @@ BEGIN
             @JsonAntes = @JsonAntes,
             @JsonDespues = @JsonDespues;
 
-        COMMIT TRANSACTION;
+        IF @TransaccionInicial = 0
+            COMMIT TRANSACTION;
 
         RETURN 0;
-
     END TRY
-
     BEGIN CATCH
-
         IF @@TRANCOUNT > 0
-        BEGIN
             ROLLBACK TRANSACTION;
-        END
 
         RETURN 2;
-
-    END CATCH
+    END CATCH;
 END;
 GO
+
 
 
 -- ============================================================
