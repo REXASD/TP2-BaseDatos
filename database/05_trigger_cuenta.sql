@@ -1,14 +1,10 @@
+
 CREATE OR ALTER TRIGGER dbo.trg_Cuenta_CrearPrimerEstadoCuenta
 ON dbo.Cuenta
 AFTER INSERT
 AS
 BEGIN
     SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    -- a) Declaración de constantes
-    DECLARE @true BIT = 1,
-            @false BIT = 0;
 
     INSERT INTO dbo.EstadoDeCuenta (
         IdCuenta
@@ -44,7 +40,7 @@ BEGIN
         , 0
         , 0
         , 0
-        , @false
+        , 0
     FROM inserted i;
 END;
 GO
