@@ -1,3 +1,540 @@
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+/*
+===================================================================
+Estandar E31: ejemplo ejecutable
+===================================================================
+DECLARE @outResult INT;
+EXEC dbo.sp_ProcesarPersonaXML
+    @inIdOperacionXML = 1,
+    @outResult = @outResult OUTPUT;
+SELECT @outResult AS Resultado;
+-- Resultado: 0 = correcto, 50430 = la operacion XML no existe
+===================================================================
+*/
+CREATE OR ALTER PROCEDURE dbo.sp_ProcesarPersonaXML
+    @inIdOperacionXML INT,
+    @outResult INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @true BIT = 1;
+
+    DECLARE @Datos XML;
+    DECLARE @Doc VARCHAR(64);
+    DECLARE @IdTipoDocu INT;
+    DECLARE @Nombre VARCHAR(64);
+    DECLARE @FechaNacimiento DATE;
+    DECLARE @Email VARCHAR(128);
+    DECLARE @Telefono1 VARCHAR(32);
+    DECLARE @Telefono2 VARCHAR(32);
+
+    BEGIN TRY
+        SELECT @Datos = o.Datos
+        FROM dbo.OperacionXML AS o
+        WHERE o.IdOperacionXML = @inIdOperacionXML;
+
+        IF @Datos IS NULL
+        BEGIN
+            SET @outResult = 50430;
+            RETURN 50430;
+        END;
+
+        SET @Doc = ISNULL(
+            @Datos.value('(/*/@ValorDocumentoIdentidad)[1]', 'VARCHAR(64)')
+            , @Datos.value('(/*/@ValorDocumentoIdentidadDelCliente)[1]', 'VARCHAR(64)')
+        );
+        SET @IdTipoDocu = @Datos.value('(/*/@TipoDocuIdentidad)[1]', 'INT');
+        SET @Nombre = @Datos.value('(/*/@Nombre)[1]', 'VARCHAR(64)');
+        SET @FechaNacimiento = @Datos.value('(/*/@FechaNacimiento)[1]', 'DATE');
+        SET @Email = ISNULL(@Datos.value('(/*/@Email)[1]', 'VARCHAR(128)'), '');
+        SET @Telefono1 = ISNULL(@Datos.value('(/*/@telefono1)[1]', 'VARCHAR(32)'), '');
+        SET @Telefono2 = ISNULL(@Datos.value('(/*/@telefono2)[1]', 'VARCHAR(32)'), '');
+
+        BEGIN TRANSACTION;
+
+            INSERT INTO dbo.Persona (
+                IdTipoDocuIdentidad
+                , ValorDocumentoIdentidad
+                , Nombre
+                , FechaNacimiento
+                , Email
+                , Telefono1
+                , Telefono2
+            )
+            SELECT
+                @IdTipoDocu
+                , @Doc
+                , @Nombre
+                , @FechaNacimiento
+                , @Email
+                , @Telefono1
+                , @Telefono2
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM dbo.Persona AS p
+                WHERE p.ValorDocumentoIdentidad = @Doc
+            );
+
+            UPDATE dbo.OperacionXML
+            SET flag_procesada = @true
+            WHERE IdOperacionXML = @inIdOperacionXML;
+
+        COMMIT TRANSACTION;
+
+        SET @outResult = 0;
+        RETURN 0;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        SET @outResult = ERROR_NUMBER();
+        THROW;
+    END CATCH;
+END;
+GO
+
+
+/*
+===================================================================
+Estandar E31: ejemplo ejecutable
+===================================================================
+DECLARE @outResult INT;
+EXEC dbo.sp_ProcesarCuentaXML
+    @inIdOperacionXML = 2,
+    @outResult = @outResult OUTPUT;
+SELECT @outResult AS Resultado;
+-- Resultado: 0 = correcto
+--            50430 = la operacion XML no existe
+--            50405 = el cliente de la cuenta no existe
+--            50406 = la cuenta no viene con saldo cero
+===================================================================
+*/
+CREATE OR ALTER PROCEDURE dbo.sp_ProcesarCuentaXML
+    @inIdOperacionXML INT,
+    @outResult INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @true BIT = 1;
+
+    DECLARE @Datos XML;
+    DECLARE @Doc VARCHAR(64);
+    DECLARE @NumeroCuenta VARCHAR(32);
+    DECLARE @Saldo DECIMAL(18,2);
+    DECLARE @IdPersona INT;
+    DECLARE @IdTipoCuenta INT;
+    DECLARE @FechaCreacion DATE;
+
+    BEGIN TRY
+        SELECT @Datos = o.Datos
+        FROM dbo.OperacionXML AS o
+        WHERE o.IdOperacionXML = @inIdOperacionXML;
+
+        IF @Datos IS NULL
+        BEGIN
+            SET @outResult = 50430;
+            RETURN 50430;
+        END;
+
+        SET @Doc = ISNULL(
+            @Datos.value('(/*/@ValorDocumentoIdentidadDelCliente)[1]', 'VARCHAR(64)')
+            , @Datos.value('(/*/@ValorDocumentoIdentidad)[1]', 'VARCHAR(64)')
+        );
+        SET @NumeroCuenta = @Datos.value('(/*/@NumeroCuenta)[1]', 'VARCHAR(32)');
+        SET @Saldo = ISNULL(@Datos.value('(/*/@Saldo)[1]', 'DECIMAL(18,2)'), 0);
+        SET @IdTipoCuenta = @Datos.value('(/*/@TipoCuentaId)[1]', 'INT');
+        SET @FechaCreacion = @Datos.value('(/*/@FechaCreacion)[1]', 'DATE');
+
+        SELECT @IdPersona = p.IdPersona
+        FROM dbo.Persona AS p
+        WHERE p.ValorDocumentoIdentidad = @Doc;
+
+        IF @IdPersona IS NULL
+        BEGIN
+            SET @outResult = 50405;
+            RETURN 50405;
+        END;
+
+        IF @Saldo <> 0
+        BEGIN
+            SET @outResult = 50406;
+            RETURN 50406;
+        END;
+
+        BEGIN TRANSACTION;
+
+            INSERT INTO dbo.Cuenta (
+                NumeroCuenta
+                , IdPersonaDueno
+                , IdTipoCuenta
+                , FechaCreacion
+                , Saldo
+            )
+            SELECT
+                @NumeroCuenta
+                , @IdPersona
+                , @IdTipoCuenta
+                , @FechaCreacion
+                , 0
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM dbo.Cuenta AS c
+                WHERE c.NumeroCuenta = @NumeroCuenta
+            );
+
+            UPDATE dbo.OperacionXML
+            SET flag_procesada = @true
+            WHERE IdOperacionXML = @inIdOperacionXML;
+
+        COMMIT TRANSACTION;
+
+        SET @outResult = 0;
+        RETURN 0;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        SET @outResult = ERROR_NUMBER();
+        THROW;
+    END CATCH;
+END;
+GO
+
+
+/*
+===================================================================
+Estandar E31: ejemplo ejecutable
+===================================================================
+DECLARE @outResult INT;
+EXEC dbo.sp_ProcesarBeneficiarioXML
+    @inIdOperacionXML = 3,
+    @outResult = @outResult OUTPUT;
+SELECT @outResult AS Resultado;
+-- Resultado: 0 = correcto
+--            50430 = la operacion XML no existe
+--            50407 = la cuenta o la persona del beneficiario no existe
+===================================================================
+*/
+CREATE OR ALTER PROCEDURE dbo.sp_ProcesarBeneficiarioXML
+    @inIdOperacionXML INT,
+    @outResult INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @true BIT = 1;
+
+    DECLARE @Datos XML;
+    DECLARE @Doc VARCHAR(64);
+    DECLARE @NumeroCuenta VARCHAR(32);
+    DECLARE @IdCuenta INT;
+    DECLARE @IdPersona INT;
+    DECLARE @IdParentezco INT;
+    DECLARE @Porcentaje INT;
+
+    BEGIN TRY
+        SELECT @Datos = o.Datos
+        FROM dbo.OperacionXML AS o
+        WHERE o.IdOperacionXML = @inIdOperacionXML;
+
+        IF @Datos IS NULL
+        BEGIN
+            SET @outResult = 50430;
+            RETURN 50430;
+        END;
+
+        SET @NumeroCuenta = @Datos.value('(/*/@NumeroCuenta)[1]', 'VARCHAR(32)');
+        SET @Doc = ISNULL(
+            @Datos.value('(/*/@ValorDocumentoIdentidadBeneficiario)[1]', 'VARCHAR(64)')
+            , @Datos.value('(/*/@ValorDocumentoIdentidad)[1]', 'VARCHAR(64)')
+        );
+        SET @IdParentezco = @Datos.value('(/*/@IdParentezco)[1]', 'INT');
+        SET @Porcentaje = @Datos.value('(/*/@Porcentaje)[1]', 'INT');
+
+        SELECT @IdCuenta = c.IdCuenta
+        FROM dbo.Cuenta AS c
+        WHERE c.NumeroCuenta = @NumeroCuenta;
+
+        SELECT @IdPersona = p.IdPersona
+        FROM dbo.Persona AS p
+        WHERE p.ValorDocumentoIdentidad = @Doc;
+
+        IF @IdCuenta IS NULL OR @IdPersona IS NULL
+        BEGIN
+            SET @outResult = 50407;
+            RETURN 50407;
+        END;
+
+        BEGIN TRANSACTION;
+
+            INSERT INTO dbo.Beneficiario (
+                IdCuenta
+                , IdPersona
+                , IdParentezco
+                , Porcentaje
+                , Activo
+                , FechaDesactivacion
+            )
+            SELECT
+                @IdCuenta
+                , @IdPersona
+                , @IdParentezco
+                , @Porcentaje
+                , @true
+                , NULL
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM dbo.Beneficiario AS b
+                WHERE b.IdCuenta = @IdCuenta
+                  AND b.IdPersona = @IdPersona
+                  AND b.Activo = @true
+            );
+
+            UPDATE dbo.OperacionXML
+            SET flag_procesada = @true
+            WHERE IdOperacionXML = @inIdOperacionXML;
+
+        COMMIT TRANSACTION;
+
+        SET @outResult = 0;
+        RETURN 0;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        SET @outResult = ERROR_NUMBER();
+        THROW;
+    END CATCH;
+END;
+GO
+
+
+/*
+===================================================================
+Estandar E31: ejemplo ejecutable
+===================================================================
+DECLARE @outResult INT;
+EXEC dbo.sp_ProcesarUsuarioXML
+    @inIdOperacionXML = 4,
+    @outResult = @outResult OUTPUT;
+SELECT @outResult AS Resultado;
+-- Resultado: 0 = correcto
+--            50430 = la operacion XML no existe
+--            50408 = la persona del usuario no existe
+===================================================================
+*/
+CREATE OR ALTER PROCEDURE dbo.sp_ProcesarUsuarioXML
+    @inIdOperacionXML INT,
+    @outResult INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @true BIT = 1;
+
+    DECLARE @Datos XML;
+    DECLARE @User VARCHAR(64);
+    DECLARE @Doc VARCHAR(64);
+    DECLARE @Pass VARCHAR(256);
+    DECLARE @flag_administrador BIT;
+    DECLARE @IdPersona INT;
+
+    BEGIN TRY
+        SELECT @Datos = o.Datos
+        FROM dbo.OperacionXML AS o
+        WHERE o.IdOperacionXML = @inIdOperacionXML;
+
+        IF @Datos IS NULL
+        BEGIN
+            SET @outResult = 50430;
+            RETURN 50430;
+        END;
+
+        SET @User = ISNULL(
+            @Datos.value('(/*/@User)[1]', 'VARCHAR(64)')
+            , @Datos.value('(/*/@NombreUsuario)[1]', 'VARCHAR(64)')
+        );
+        SET @Doc = @Datos.value('(/*/@ValorDocId)[1]', 'VARCHAR(64)');
+        SET @Pass = @Datos.value('(/*/@Pass)[1]', 'VARCHAR(256)');
+        SET @flag_administrador = @Datos.value('(/*/@EsAdministrador)[1]', 'BIT');
+
+        SELECT @IdPersona = p.IdPersona
+        FROM dbo.Persona AS p
+        WHERE p.ValorDocumentoIdentidad = @Doc;
+
+        IF @IdPersona IS NULL
+        BEGIN
+            SET @outResult = 50408;
+            RETURN 50408;
+        END;
+
+        BEGIN TRANSACTION;
+
+            INSERT INTO dbo.Usuario (
+                [User]
+                , Pass
+                , EsAdministrador
+                , IdPersona
+            )
+            SELECT
+                @User
+                , @Pass
+                , @flag_administrador
+                , @IdPersona
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM dbo.Usuario AS u
+                WHERE u.[User] = @User
+            );
+
+            UPDATE dbo.OperacionXML
+            SET flag_procesada = @true
+            WHERE IdOperacionXML = @inIdOperacionXML;
+
+        COMMIT TRANSACTION;
+
+        SET @outResult = 0;
+        RETURN 0;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        SET @outResult = ERROR_NUMBER();
+        THROW;
+    END CATCH;
+END;
+GO
+
+
+/*
+===================================================================
+Estandar E31: ejemplo ejecutable
+===================================================================
+DECLARE @outResult INT;
+EXEC dbo.sp_ProcesarUsuarioPuedeVerXML
+    @inIdOperacionXML = 5,
+    @outResult = @outResult OUTPUT;
+SELECT @outResult AS Resultado;
+-- Resultado: 0 = correcto
+--            50430 = la operacion XML no existe
+--            50409 = el usuario o la cuenta no existe
+===================================================================
+*/
+CREATE OR ALTER PROCEDURE dbo.sp_ProcesarUsuarioPuedeVerXML
+    @inIdOperacionXML INT,
+    @outResult INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @true BIT = 1;
+
+    DECLARE @Datos XML;
+    DECLARE @User VARCHAR(64);
+    DECLARE @NumeroCuenta VARCHAR(32);
+    DECLARE @IdUsuario INT;
+    DECLARE @IdCuenta INT;
+
+    BEGIN TRY
+        SELECT @Datos = o.Datos
+        FROM dbo.OperacionXML AS o
+        WHERE o.IdOperacionXML = @inIdOperacionXML;
+
+        IF @Datos IS NULL
+        BEGIN
+            SET @outResult = 50430;
+            RETURN 50430;
+        END;
+
+        SET @User = ISNULL(
+            @Datos.value('(/*/@User)[1]', 'VARCHAR(64)')
+            , @Datos.value('(/*/@NombreUsuario)[1]', 'VARCHAR(64)')
+        );
+        SET @NumeroCuenta = @Datos.value('(/*/@NumeroCuenta)[1]', 'VARCHAR(32)');
+
+        SELECT @IdUsuario = u.IdUsuario
+        FROM dbo.Usuario AS u
+        WHERE u.[User] = @User;
+
+        SELECT @IdCuenta = c.IdCuenta
+        FROM dbo.Cuenta AS c
+        WHERE c.NumeroCuenta = @NumeroCuenta;
+
+        IF @IdUsuario IS NULL OR @IdCuenta IS NULL
+        BEGIN
+            SET @outResult = 50409;
+            RETURN 50409;
+        END;
+
+        BEGIN TRANSACTION;
+
+            INSERT INTO dbo.UsuarioCuenta (
+                IdUsuario
+                , IdCuenta
+            )
+            SELECT
+                @IdUsuario
+                , @IdCuenta
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM dbo.UsuarioCuenta AS uc
+                WHERE uc.IdUsuario = @IdUsuario
+                  AND uc.IdCuenta = @IdCuenta
+            );
+
+            UPDATE dbo.OperacionXML
+            SET flag_procesada = @true
+            WHERE IdOperacionXML = @inIdOperacionXML;
+
+        COMMIT TRANSACTION;
+
+        SET @outResult = 0;
+        RETURN 0;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        SET @outResult = ERROR_NUMBER();
+        THROW;
+    END CATCH;
+END;
+GO
+
+
+/*
+===================================================================
+Estandar E31: ejemplo ejecutable
+===================================================================
+-- Ejecutar sin BEGIN TRAN externo. Procesa una fecha de operacion:
+-- primero cada operacion XML pendiente (en orden de archivo) y
+-- luego los cierres de estado de cuenta que vencen ese dia.
+DECLARE @outResult INT;
+EXEC dbo.sp_ProcesarFechaOperacion
+    @inFecha = '20260301',
+    @outResult = @outResult OUTPUT;
+SELECT @outResult AS Resultado;
+-- Cada operacion confirma sus cambios y flag_procesada juntos. Si una
+-- falla, se retoma desde la primera pendiente. La fecha solo se marca
+-- procesada al terminar operaciones y cierres. Un candado de sesion
+-- impide dos simulaciones a la vez.
+===================================================================
+*/
 CREATE OR ALTER PROCEDURE dbo.sp_ProcesarFechaOperacion
     @inFecha DATE,
     @outResult INT OUTPUT
@@ -6,958 +543,232 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
+    DECLARE @true BIT = 1,
+            @false BIT = 0;
+
+    DECLARE @flag_procesada BIT;
+    DECLARE @flag_candado BIT = 0;
+    DECLARE @Candado INT;
+    DECLARE @IdOp INT;
+    DECLARE @Nodo VARCHAR(128);
+    DECLARE @Datos XML;
+    DECLARE @ResultadoSP INT;
+    DECLARE @IdEstado INT;
+    DECLARE @IdEstadoNuevo INT;
+    DECLARE @IdTipo INT;
+    DECLARE @NumeroCuenta VARCHAR(32);
+    DECLARE @Tipo VARCHAR(128);
+    DECLARE @Monto DECIMAL(18,2);
+    DECLARE @Descripcion VARCHAR(256);
+    DECLARE @FechaMov DATETIME;
+    DECLARE @Mensaje NVARCHAR(1024);
+
     BEGIN TRY
-        ----------------------------------------------------------------
-        -- a) Constantes
-        ----------------------------------------------------------------
-        DECLARE @true BIT = 1,
-                @false BIT = 0;
-
-        ----------------------------------------------------------------
-        -- b) Variables
-        ----------------------------------------------------------------
-        DECLARE @Procesada BIT;
-        DECLARE @IdOp INT;
-        DECLARE @Nodo VARCHAR(128);
-        DECLARE @Datos XML;
-
-        DECLARE @ResultadoSP INT;
-        DECLARE @IdEstado INT;
-        DECLARE @IdEstadoNuevo INT;
-
-        DECLARE @IdTipo INT;
-        DECLARE @IdPersona INT;
-        DECLARE @IdCuenta INT;
-        DECLARE @IdUsuario INT;
-
-        DECLARE @Doc VARCHAR(64);
-        DECLARE @NumeroCuenta VARCHAR(32);
-        DECLARE @User VARCHAR(64);
-
-        DECLARE @Tipo VARCHAR(128);
-        DECLARE @Monto DECIMAL(18,2);
-        DECLARE @Descripcion VARCHAR(256);
-
-        DECLARE @FechaMov DATETIME;
-        DECLARE @Saldo DECIMAL(18,2);
-
-        DECLARE @TipoDocumento INT;
-        DECLARE @Nombre VARCHAR(64);
-        DECLARE @FechaNacimiento DATE;
-        DECLARE @Email VARCHAR(128);
-        DECLARE @Telefono1 VARCHAR(32);
-        DECLARE @Telefono2 VARCHAR(32);
-
-        DECLARE @TipoCuenta INT;
-        DECLARE @FechaCreacion DATE;
-
-        DECLARE @IdParentezco INT;
-        DECLARE @Porcentaje INT;
-
-        DECLARE @EsAdministrador BIT;
-        DECLARE @Password VARCHAR(256);
-
-        DECLARE @Mensaje VARCHAR(MAX);
-        DECLARE @Candado INT;
-        DECLARE @TieneCandado BIT = 0;
-
         SET @outResult = 50000;
 
-        ----------------------------------------------------------------
-        -- c) Validaciones iniciales
-        ----------------------------------------------------------------
-        IF @inFecha IS NULL
-        BEGIN
-            THROW 50400, 'Debe indicar una fecha valida.', 1;
-        END;
-
         IF @@TRANCOUNT <> 0
-        BEGIN
-            THROW 50400,
-                'Ejecute la simulacion sin una transaccion externa.',
-                1;
-        END;
+            THROW 50400, 'Ejecute la simulacion sin una transaccion externa.', 1;
 
-        ----------------------------------------------------------------
-        -- d) Obtener candado exclusivo de sesion
-        ----------------------------------------------------------------
         EXEC @Candado = sys.sp_getapplock
-            @Resource = 'sp_ProcesarSimulacion',
-            @LockMode = 'Exclusive',
-            @LockOwner = 'Session',
-            @LockTimeout = 0;
+            @Resource = 'sp_ProcesarSimulacion'
+            , @LockMode = 'Exclusive'
+            , @LockOwner = 'Session'
+            , @LockTimeout = 0;
 
         IF @Candado < 0
-        BEGIN
-            THROW 50420,
-                'Ya hay un proceso de simulacion en ejecucion.',
-                1;
-        END;
+            THROW 50420, 'Ya hay un proceso de simulacion en ejecucion.', 1;
 
-        SET @TieneCandado = 1;
+        SET @flag_candado = @true;
 
-        ----------------------------------------------------------------
-        -- e) Validar existencia y estado de la fecha
-        ----------------------------------------------------------------
-        SELECT
-            @Procesada = cf.flag_procesada
-        FROM dbo.ControlFechaOperacion AS cf
-        WHERE cf.Fecha = @inFecha;
+        SELECT @flag_procesada = c.flag_procesada
+        FROM dbo.ControlFechaOperacion AS c
+        WHERE c.Fecha = @inFecha;
 
-        IF @Procesada IS NULL
-        BEGIN
-            THROW 50401,
-                'La fecha no existe en ControlFechaOperacion.',
-                1;
-        END;
+        IF @flag_procesada IS NULL
+            THROW 50401, 'La fecha no existe en ControlFechaOperacion.', 1;
 
-        IF @Procesada = @true
+        IF @flag_procesada = @true
         BEGIN
             EXEC sys.sp_releaseapplock
-                @Resource = 'sp_ProcesarSimulacion',
-                @LockOwner = 'Session';
+                @Resource = 'sp_ProcesarSimulacion'
+                , @LockOwner = 'Session';
 
-            SET @TieneCandado = 0;
+            SET @flag_candado = @false;
             SET @outResult = 0;
-
             RETURN 0;
         END;
 
         IF EXISTS (
             SELECT 1
-            FROM dbo.ControlFechaOperacion AS cf
-            WHERE cf.Fecha < @inFecha
-              AND cf.flag_procesada = @false
+            FROM dbo.ControlFechaOperacion AS c
+            WHERE c.Fecha < @inFecha
+              AND c.flag_procesada = @false
         )
-        BEGIN
             THROW 50402,
                 'Hay fechas anteriores sin procesar; deben procesarse primero.',
                 1;
-        END;
 
-        ----------------------------------------------------------------
-        -- f) Registrar intento de procesamiento
-        ----------------------------------------------------------------
         UPDATE dbo.ControlFechaOperacion
-        SET
-            Intentos = Intentos + 1,
-            FechaUltimoIntento = GETDATE()
-        WHERE Fecha = @inFecha
-          AND flag_procesada = @false;
+        SET Intentos = Intentos + 1
+            , FechaUltimoIntento = GETDATE()
+        WHERE Fecha = @inFecha;
 
         SET @FechaMov = CONVERT(DATETIME, @inFecha);
 
-        ----------------------------------------------------------------
-        -- g) Procesar operaciones XML pendientes
-        ----------------------------------------------------------------
         WHILE 1 = 1
         BEGIN
             SET @IdOp = NULL;
-            SET @Nodo = NULL;
-            SET @Datos = NULL;
 
             SELECT TOP (1)
-                @IdOp = ox.IdOperacionXML,
-                @Nodo = ox.NombreNodo,
-                @Datos = ox.Datos
-            FROM dbo.OperacionXML AS ox
-            WHERE ox.Fecha = @inFecha
-              AND ox.flag_procesada = @false
-            ORDER BY
-                ox.OrdenEnArchivo,
-                ox.IdOperacionXML;
+                @IdOp = o.IdOperacionXML
+                , @Nodo = o.NombreNodo
+                , @Datos = o.Datos
+            FROM dbo.OperacionXML AS o
+            WHERE o.Fecha = @inFecha
+              AND o.flag_procesada = @false
+            ORDER BY o.OrdenEnArchivo, o.IdOperacionXML;
 
             IF @IdOp IS NULL
                 BREAK;
 
-            BEGIN TRANSACTION;
-
-            ------------------------------------------------------------
-            -- g.1) Movimientos
-            ------------------------------------------------------------
             IF @Nodo = 'Movimientos'
             BEGIN
-                IF @Datos.exist(
-                    '(/*/@CodigoCuenta)[1]'
-                ) = 0
-                OR @Datos.exist(
-                    '(/*/@Tipo)[1]'
-                ) = 0
-                OR @Datos.exist(
-                    '(/*/@Monto)[1]'
-                ) = 0
-                BEGIN
-                    THROW 50413,
-                        'El movimiento XML no contiene cuenta, tipo o monto.',
-                        1;
-                END;
-
-                SET @NumeroCuenta = @Datos.value(
-                    '(/*/@CodigoCuenta)[1]',
-                    'VARCHAR(32)'
+                SET @NumeroCuenta = @Datos.value('(/*/@CodigoCuenta)[1]', 'VARCHAR(32)');
+                SET @Tipo = @Datos.value('(/*/@Tipo)[1]', 'VARCHAR(128)');
+                SET @Monto = @Datos.value('(/*/@Monto)[1]', 'DECIMAL(18,2)');
+                SET @Descripcion = ISNULL(
+                    @Datos.value('(/*/@Descripcion)[1]', 'VARCHAR(256)')
+                    , ''
                 );
-
-                SET @Tipo = @Datos.value(
-                    '(/*/@Tipo)[1]',
-                    'VARCHAR(128)'
-                );
-
-                SET @Monto = @Datos.value(
-                    '(/*/@Monto)[1]',
-                    'DECIMAL(18,2)'
-                );
-
-                SET @Descripcion = '';
-
-                IF @Datos.exist('(/*/@Descripcion)[1]') = 1
-                BEGIN
-                    SET @Descripcion = @Datos.value(
-                        '(/*/@Descripcion)[1]',
-                        'VARCHAR(256)'
-                    );
-                END;
-
-                IF @NumeroCuenta IS NULL
-                   OR LTRIM(RTRIM(@NumeroCuenta)) = ''
-                   OR @Tipo IS NULL
-                   OR LTRIM(RTRIM(@Tipo)) = ''
-                   OR @Monto <= 0
-                BEGIN
-                    THROW 50413,
-                        'Los datos del movimiento XML no son validos.',
-                        1;
-                END;
 
                 SET @IdTipo = NULL;
+                SELECT @IdTipo = t.Id
+                FROM dbo.TipoMovimiento AS t
+                WHERE t.Nombre = LTRIM(RTRIM(@Tipo));
 
-                SELECT
-                    @IdTipo = tm.Id
-                FROM dbo.TipoMovimiento AS tm
-                WHERE tm.Nombre = LTRIM(RTRIM(@Tipo));
-
-                IF @IdTipo IS NULL
-                BEGIN
-                    THROW 50403,
-                        'El tipo de movimiento del XML no existe en el catalogo.',
-                        1;
-                END;
-
-                SET @ResultadoSP = 50000;
-
-                EXEC dbo.sp_AplicarMovimiento
-                    @inNumeroCuenta = @NumeroCuenta,
-                    @inIdTipoMovimiento = @IdTipo,
-                    @inFecha = @FechaMov,
-                    @inMonto = @Monto,
-                    @inDescripcion = @Descripcion,
-                    @outResult = @ResultadoSP OUTPUT,
-                    @inIdOperacionXML = @IdOp;
-
-                IF @ResultadoSP <> 0
-                BEGIN
-                    THROW 50404,
-                        'No fue posible aplicar un movimiento del XML.',
-                        1;
-                END;
-            END;
-
-            ------------------------------------------------------------
-            -- g.2) Personas
-            ------------------------------------------------------------
+                SET @ResultadoSP = 50403;
+                IF @IdTipo IS NOT NULL
+                    EXEC dbo.sp_AplicarMovimiento
+                        @inNumeroCuenta = @NumeroCuenta
+                        , @inIdTipoMovimiento = @IdTipo
+                        , @inFecha = @FechaMov
+                        , @inMonto = @Monto
+                        , @inDescripcion = @Descripcion
+                        , @outResult = @ResultadoSP OUTPUT
+                        , @inIdOperacionXML = @IdOp;
+            END
             ELSE IF @Nodo = 'Persona'
-            BEGIN
-                SET @Doc = NULL;
-
-                IF @Datos.exist(
-                    '(/*/@ValorDocumentoIdentidad)[1]'
-                ) = 1
-                BEGIN
-                    SET @Doc = @Datos.value(
-                        '(/*/@ValorDocumentoIdentidad)[1]',
-                        'VARCHAR(64)'
-                    );
-                END;
-                ELSE IF @Datos.exist(
-                    '(/*/@ValorDocumentoIdentidadDelCliente)[1]'
-                ) = 1
-                BEGIN
-                    SET @Doc = @Datos.value(
-                        '(/*/@ValorDocumentoIdentidadDelCliente)[1]',
-                        'VARCHAR(64)'
-                    );
-                END;
-
-                IF @Doc IS NULL
-                   OR @Datos.exist('(/*/@TipoDocuIdentidad)[1]') = 0
-                   OR @Datos.exist('(/*/@Nombre)[1]') = 0
-                   OR @Datos.exist('(/*/@FechaNacimiento)[1]') = 0
-                BEGIN
-                    THROW 50413,
-                        'El nodo Persona no contiene todos los datos obligatorios.',
-                        1;
-                END;
-
-                SET @TipoDocumento = @Datos.value(
-                    '(/*/@TipoDocuIdentidad)[1]',
-                    'INT'
-                );
-
-                SET @Nombre = @Datos.value(
-                    '(/*/@Nombre)[1]',
-                    'VARCHAR(64)'
-                );
-
-                SET @FechaNacimiento = @Datos.value(
-                    '(/*/@FechaNacimiento)[1]',
-                    'DATE'
-                );
-
-                SET @Email = '';
-                SET @Telefono1 = '';
-                SET @Telefono2 = '';
-
-                IF @Datos.exist('(/*/@Email)[1]') = 1
-                BEGIN
-                    SET @Email = @Datos.value(
-                        '(/*/@Email)[1]',
-                        'VARCHAR(128)'
-                    );
-                END;
-
-                IF @Datos.exist('(/*/@telefono1)[1]') = 1
-                BEGIN
-                    SET @Telefono1 = @Datos.value(
-                        '(/*/@telefono1)[1]',
-                        'VARCHAR(32)'
-                    );
-                END;
-
-                IF @Datos.exist('(/*/@telefono2)[1]') = 1
-                BEGIN
-                    SET @Telefono2 = @Datos.value(
-                        '(/*/@telefono2)[1]',
-                        'VARCHAR(32)'
-                    );
-                END;
-
-                IF EXISTS (
-                    SELECT 1
-                    FROM dbo.Persona AS p WITH (UPDLOCK, HOLDLOCK)
-                    WHERE p.ValorDocumentoIdentidad = @Doc
-                )
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM dbo.Persona AS p
-                        WHERE p.ValorDocumentoIdentidad = @Doc
-                          AND p.IdTipoDocuIdentidad = @TipoDocumento
-                          AND p.Nombre = @Nombre
-                          AND p.FechaNacimiento = @FechaNacimiento
-                          AND ISNULL(p.Email, '') = @Email
-                          AND ISNULL(p.Telefono1, '') = @Telefono1
-                          AND ISNULL(p.Telefono2, '') = @Telefono2
-                    )
-                    BEGIN
-                        THROW 50415,
-                            'La persona ya existe, pero sus datos no coinciden con el XML.',
-                            1;
-                    END;
-                END;
-                ELSE
-                BEGIN
-                    INSERT INTO dbo.Persona (
-                        IdTipoDocuIdentidad,
-                        ValorDocumentoIdentidad,
-                        Nombre,
-                        FechaNacimiento,
-                        Email,
-                        Telefono1,
-                        Telefono2
-                    )
-                    VALUES (
-                        @TipoDocumento,
-                        @Doc,
-                        @Nombre,
-                        @FechaNacimiento,
-                        @Email,
-                        @Telefono1,
-                        @Telefono2
-                    );
-                END;
-            END;
-
-            ------------------------------------------------------------
-            -- g.3) Cuentas
-            ------------------------------------------------------------
+                EXEC dbo.sp_ProcesarPersonaXML
+                    @inIdOperacionXML = @IdOp
+                    , @outResult = @ResultadoSP OUTPUT;
             ELSE IF @Nodo = 'Cuenta'
-            BEGIN
-                SET @Doc = NULL;
-
-                IF @Datos.exist(
-                    '(/*/@ValorDocumentoIdentidadDelCliente)[1]'
-                ) = 1
-                BEGIN
-                    SET @Doc = @Datos.value(
-                        '(/*/@ValorDocumentoIdentidadDelCliente)[1]',
-                        'VARCHAR(64)'
-                    );
-                END;
-                ELSE IF @Datos.exist(
-                    '(/*/@ValorDocumentoIdentidad)[1]'
-                ) = 1
-                BEGIN
-                    SET @Doc = @Datos.value(
-                        '(/*/@ValorDocumentoIdentidad)[1]',
-                        'VARCHAR(64)'
-                    );
-                END;
-
-                IF @Doc IS NULL
-                   OR @Datos.exist('(/*/@NumeroCuenta)[1]') = 0
-                   OR @Datos.exist('(/*/@TipoCuentaId)[1]') = 0
-                   OR @Datos.exist('(/*/@FechaCreacion)[1]') = 0
-                BEGIN
-                    THROW 50413,
-                        'El nodo Cuenta no contiene todos los datos obligatorios.',
-                        1;
-                END;
-
-                SET @NumeroCuenta = @Datos.value(
-                    '(/*/@NumeroCuenta)[1]',
-                    'VARCHAR(32)'
-                );
-
-                SET @TipoCuenta = @Datos.value(
-                    '(/*/@TipoCuentaId)[1]',
-                    'INT'
-                );
-
-                SET @FechaCreacion = @Datos.value(
-                    '(/*/@FechaCreacion)[1]',
-                    'DATE'
-                );
-
-                SET @Saldo = 0;
-
-                IF @Datos.exist('(/*/@Saldo)[1]') = 1
-                BEGIN
-                    SET @Saldo = @Datos.value(
-                        '(/*/@Saldo)[1]',
-                        'DECIMAL(18,2)'
-                    );
-                END;
-
-                SET @IdPersona = NULL;
-
-                SELECT
-                    @IdPersona = p.IdPersona
-                FROM dbo.Persona AS p WITH (UPDLOCK, HOLDLOCK)
-                WHERE p.ValorDocumentoIdentidad = @Doc;
-
-                IF @IdPersona IS NULL
-                BEGIN
-                    THROW 50405,
-                        'El cliente de la cuenta no existe.',
-                        1;
-                END;
-
-                IF @Saldo <> 0
-                BEGIN
-                    THROW 50406,
-                        'Las cuentas deben crearse con saldo cero.',
-                        1;
-                END;
-
-                IF EXISTS (
-                    SELECT 1
-                    FROM dbo.Cuenta AS c WITH (UPDLOCK, HOLDLOCK)
-                    WHERE c.NumeroCuenta = @NumeroCuenta
-                )
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM dbo.Cuenta AS c
-                        WHERE c.NumeroCuenta = @NumeroCuenta
-                          AND c.IdPersonaDueno = @IdPersona
-                          AND c.IdTipoCuenta = @TipoCuenta
-                          AND c.FechaCreacion = @FechaCreacion
-                          AND c.Saldo = 0
-                    )
-                    BEGIN
-                        THROW 50415,
-                            'La cuenta ya existe, pero sus datos no coinciden con el XML.',
-                            1;
-                    END;
-                END;
-                ELSE
-                BEGIN
-                    INSERT INTO dbo.Cuenta (
-                        NumeroCuenta,
-                        IdPersonaDueno,
-                        IdTipoCuenta,
-                        FechaCreacion,
-                        Saldo
-                    )
-                    VALUES (
-                        @NumeroCuenta,
-                        @IdPersona,
-                        @TipoCuenta,
-                        @FechaCreacion,
-                        0
-                    );
-                END;
-            END;
-
-            ------------------------------------------------------------
-            -- g.4) Beneficiarios
-            ------------------------------------------------------------
+                EXEC dbo.sp_ProcesarCuentaXML
+                    @inIdOperacionXML = @IdOp
+                    , @outResult = @ResultadoSP OUTPUT;
             ELSE IF @Nodo = 'Beneficiario'
-            BEGIN
-                SET @NumeroCuenta = NULL;
-                SET @Doc = NULL;
-
-                IF @Datos.exist('(/*/@NumeroCuenta)[1]') = 0
-                   OR @Datos.exist('(/*/@IdParentezco)[1]') = 0
-                   OR @Datos.exist('(/*/@Porcentaje)[1]') = 0
-                BEGIN
-                    THROW 50413,
-                        'El nodo Beneficiario no contiene todos los datos obligatorios.',
-                        1;
-                END;
-
-                SET @NumeroCuenta = @Datos.value(
-                    '(/*/@NumeroCuenta)[1]',
-                    'VARCHAR(32)'
-                );
-
-                IF @Datos.exist(
-                    '(/*/@ValorDocumentoIdentidadBeneficiario)[1]'
-                ) = 1
-                BEGIN
-                    SET @Doc = @Datos.value(
-                        '(/*/@ValorDocumentoIdentidadBeneficiario)[1]',
-                        'VARCHAR(64)'
-                    );
-                END;
-                ELSE IF @Datos.exist(
-                    '(/*/@ValorDocumentoIdentidad)[1]'
-                ) = 1
-                BEGIN
-                    SET @Doc = @Datos.value(
-                        '(/*/@ValorDocumentoIdentidad)[1]',
-                        'VARCHAR(64)'
-                    );
-                END;
-
-                IF @Doc IS NULL
-                BEGIN
-                    THROW 50413,
-                        'El nodo Beneficiario no contiene el documento de identidad.',
-                        1;
-                END;
-
-                SET @IdParentezco = @Datos.value(
-                    '(/*/@IdParentezco)[1]',
-                    'INT'
-                );
-
-                SET @Porcentaje = @Datos.value(
-                    '(/*/@Porcentaje)[1]',
-                    'INT'
-                );
-
-                SET @IdCuenta = NULL;
-                SET @IdPersona = NULL;
-
-                SELECT
-                    @IdCuenta = c.IdCuenta
-                FROM dbo.Cuenta AS c WITH (UPDLOCK, HOLDLOCK)
-                WHERE c.NumeroCuenta = @NumeroCuenta;
-
-                SELECT
-                    @IdPersona = p.IdPersona
-                FROM dbo.Persona AS p WITH (UPDLOCK, HOLDLOCK)
-                WHERE p.ValorDocumentoIdentidad = @Doc;
-
-                IF @IdCuenta IS NULL OR @IdPersona IS NULL
-                BEGIN
-                    THROW 50407,
-                        'La cuenta o la persona del beneficiario no existe.',
-                        1;
-                END;
-
-                IF EXISTS (
-                    SELECT 1
-                    FROM dbo.Beneficiario AS b WITH (UPDLOCK, HOLDLOCK)
-                    WHERE b.IdCuenta = @IdCuenta
-                      AND b.IdPersona = @IdPersona
-                      AND b.Activo = @true
-                )
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM dbo.Beneficiario AS b
-                        WHERE b.IdCuenta = @IdCuenta
-                          AND b.IdPersona = @IdPersona
-                          AND b.Activo = @true
-                          AND b.IdParentezco = @IdParentezco
-                          AND b.Porcentaje = @Porcentaje
-                    )
-                    BEGIN
-                        THROW 50415,
-                            'El beneficiario ya existe, pero sus datos no coinciden con el XML.',
-                            1;
-                    END;
-                END;
-                ELSE
-                BEGIN
-                    INSERT INTO dbo.Beneficiario (
-                        IdCuenta,
-                        IdPersona,
-                        IdParentezco,
-                        Porcentaje,
-                        Activo,
-                        FechaDesactivacion
-                    )
-                    VALUES (
-                        @IdCuenta,
-                        @IdPersona,
-                        @IdParentezco,
-                        @Porcentaje,
-                        @true,
-                        NULL
-                    );
-                END;
-            END;
-
-            ------------------------------------------------------------
-            -- g.5) Usuarios
-            ------------------------------------------------------------
+                EXEC dbo.sp_ProcesarBeneficiarioXML
+                    @inIdOperacionXML = @IdOp
+                    , @outResult = @ResultadoSP OUTPUT;
             ELSE IF @Nodo = 'Usuario'
-            BEGIN
-                SET @User = NULL;
-
-                IF @Datos.exist('(/*/@User)[1]') = 1
-                BEGIN
-                    SET @User = @Datos.value(
-                        '(/*/@User)[1]',
-                        'VARCHAR(64)'
-                    );
-                END;
-                ELSE IF @Datos.exist('(/*/@NombreUsuario)[1]') = 1
-                BEGIN
-                    SET @User = @Datos.value(
-                        '(/*/@NombreUsuario)[1]',
-                        'VARCHAR(64)'
-                    );
-                END;
-
-                IF @User IS NULL
-                   OR @Datos.exist('(/*/@ValorDocId)[1]') = 0
-                   OR @Datos.exist('(/*/@Pass)[1]') = 0
-                   OR @Datos.exist('(/*/@EsAdministrador)[1]') = 0
-                BEGIN
-                    THROW 50413,
-                        'El nodo Usuario no contiene todos los datos obligatorios.',
-                        1;
-                END;
-
-                SET @Doc = @Datos.value(
-                    '(/*/@ValorDocId)[1]',
-                    'VARCHAR(64)'
-                );
-
-                SET @Password = @Datos.value(
-                    '(/*/@Pass)[1]',
-                    'VARCHAR(256)'
-                );
-
-                SET @EsAdministrador = @Datos.value(
-                    '(/*/@EsAdministrador)[1]',
-                    'BIT'
-                );
-
-                SET @IdPersona = NULL;
-
-                SELECT
-                    @IdPersona = p.IdPersona
-                FROM dbo.Persona AS p WITH (UPDLOCK, HOLDLOCK)
-                WHERE p.ValorDocumentoIdentidad = @Doc;
-
-                IF @IdPersona IS NULL
-                BEGIN
-                    THROW 50408,
-                        'La persona del usuario no existe.',
-                        1;
-                END;
-
-                IF EXISTS (
-                    SELECT 1
-                    FROM dbo.Usuario AS u WITH (UPDLOCK, HOLDLOCK)
-                    WHERE u.[User] = @User
-                )
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM dbo.Usuario AS u
-                        WHERE u.[User] = @User
-                          AND u.IdPersona = @IdPersona
-                          AND u.EsAdministrador = @EsAdministrador
-                    )
-                    BEGIN
-                        THROW 50415,
-                            'El usuario ya existe, pero sus datos no coinciden con el XML.',
-                            1;
-                    END;
-                END;
-                ELSE
-                BEGIN
-                    INSERT INTO dbo.Usuario (
-                        [User],
-                        Pass,
-                        EsAdministrador,
-                        IdPersona
-                    )
-                    VALUES (
-                        @User,
-                        @Password,
-                        @EsAdministrador,
-                        @IdPersona
-                    );
-                END;
-            END;
-
-            ------------------------------------------------------------
-            -- g.6) UsuarioPuedeVer
-            ------------------------------------------------------------
+                EXEC dbo.sp_ProcesarUsuarioXML
+                    @inIdOperacionXML = @IdOp
+                    , @outResult = @ResultadoSP OUTPUT;
             ELSE IF @Nodo = 'UsuarioPuedeVer'
-            BEGIN
-                SET @User = NULL;
-
-                IF @Datos.exist('(/*/@User)[1]') = 1
-                BEGIN
-                    SET @User = @Datos.value(
-                        '(/*/@User)[1]',
-                        'VARCHAR(64)'
-                    );
-                END;
-                ELSE IF @Datos.exist('(/*/@NombreUsuario)[1]') = 1
-                BEGIN
-                    SET @User = @Datos.value(
-                        '(/*/@NombreUsuario)[1]',
-                        'VARCHAR(64)'
-                    );
-                END;
-
-                IF @User IS NULL
-                   OR @Datos.exist('(/*/@NumeroCuenta)[1]') = 0
-                BEGIN
-                    THROW 50413,
-                        'El nodo UsuarioPuedeVer no contiene usuario o cuenta.',
-                        1;
-                END;
-
-                SET @NumeroCuenta = @Datos.value(
-                    '(/*/@NumeroCuenta)[1]',
-                    'VARCHAR(32)'
-                );
-
-                SET @IdUsuario = NULL;
-                SET @IdCuenta = NULL;
-
-                SELECT
-                    @IdUsuario = u.IdUsuario
-                FROM dbo.Usuario AS u WITH (UPDLOCK, HOLDLOCK)
-                WHERE u.[User] = @User;
-
-                SELECT
-                    @IdCuenta = c.IdCuenta
-                FROM dbo.Cuenta AS c WITH (UPDLOCK, HOLDLOCK)
-                WHERE c.NumeroCuenta = @NumeroCuenta;
-
-                IF @IdUsuario IS NULL OR @IdCuenta IS NULL
-                BEGIN
-                    THROW 50409,
-                        'El usuario o la cuenta de UsuarioPuedeVer no existe.',
-                        1;
-                END;
-
-                IF NOT EXISTS (
-                    SELECT 1
-                    FROM dbo.UsuarioCuenta AS uc WITH (UPDLOCK, HOLDLOCK)
-                    WHERE uc.IdUsuario = @IdUsuario
-                      AND uc.IdCuenta = @IdCuenta
-                )
-                BEGIN
-                    INSERT INTO dbo.UsuarioCuenta (
-                        IdUsuario,
-                        IdCuenta
-                    )
-                    VALUES (
-                        @IdUsuario,
-                        @IdCuenta
-                    );
-                END;
-            END;
+                EXEC dbo.sp_ProcesarUsuarioPuedeVerXML
+                    @inIdOperacionXML = @IdOp
+                    , @outResult = @ResultadoSP OUTPUT;
             ELSE
+                SET @ResultadoSP = 50410;
+
+            IF @ResultadoSP <> 0
             BEGIN
-                THROW 50410,
-                    'Nodo desconocido en OperacionXML.',
-                    1;
+                SET @Mensaje = CONCAT(
+                    'Fallo la operacion XML ', @IdOp
+                    , ' (nodo ', @Nodo, ', codigo ', @ResultadoSP, ').'
+                );
+                THROW 50404, @Mensaje, 1;
             END;
 
-            ------------------------------------------------------------
-            -- g.7) Marcar operación como procesada
-            ------------------------------------------------------------
             UPDATE dbo.OperacionXML
             SET flag_procesada = @true
             WHERE IdOperacionXML = @IdOp
               AND flag_procesada = @false;
-
-            IF @@ROWCOUNT <> 1
-            BEGIN
-                THROW 50416,
-                    'No fue posible marcar la operacion XML como procesada.',
-                    1;
-            END;
-
-            COMMIT TRANSACTION;
         END;
 
-        ----------------------------------------------------------------
-        -- h) Cerrar estados de cuenta correspondientes a la fecha
-        ----------------------------------------------------------------
         WHILE 1 = 1
         BEGIN
             SET @IdEstado = NULL;
-            SET @IdEstadoNuevo = NULL;
-            SET @ResultadoSP = 50000;
 
-            SELECT TOP (1)
-                @IdEstado = e.IdEstadoCuenta
+            SELECT TOP (1) @IdEstado = e.IdEstadoCuenta
             FROM dbo.EstadoDeCuenta AS e
             WHERE e.Cerrado = @false
               AND e.FechaFin = @inFecha
-            ORDER BY
-                e.IdCuenta,
-                e.IdEstadoCuenta;
+            ORDER BY e.IdCuenta, e.IdEstadoCuenta;
 
             IF @IdEstado IS NULL
                 BREAK;
 
             EXEC dbo.sp_CerrarEstadoCuenta
-                @inIdEstadoCuenta = @IdEstado,
-                @inFechaCierre = @inFecha,
-                @outResult = @ResultadoSP OUTPUT,
-                @outIdNuevoEstadoCuenta = @IdEstadoNuevo OUTPUT;
+                @inIdEstadoCuenta = @IdEstado
+                , @inFechaCierre = @inFecha
+                , @outResult = @ResultadoSP OUTPUT
+                , @outIdNuevoEstadoCuenta = @IdEstadoNuevo OUTPUT;
 
             IF @ResultadoSP <> 0
             BEGIN
-                THROW 50411,
-                    'No fue posible cerrar un estado de cuenta.',
-                    1;
-            END;
-
-            IF EXISTS (
-                SELECT 1
-                FROM dbo.EstadoDeCuenta AS e
-                WHERE e.IdEstadoCuenta = @IdEstado
-                  AND e.Cerrado = @false
-            )
-            BEGIN
-                THROW 50414,
-                    'El procedimiento de cierre no cerro el estado de cuenta.',
-                    1;
+                SET @Mensaje = CONCAT(
+                    'Fallo el cierre del estado de cuenta ', @IdEstado
+                    , ' (codigo ', @ResultadoSP, ').'
+                );
+                THROW 50411, @Mensaje, 1;
             END;
         END;
 
-        ----------------------------------------------------------------
-        -- i) Validar que no queden estados vencidos abiertos
-        ----------------------------------------------------------------
         IF EXISTS (
             SELECT 1
             FROM dbo.EstadoDeCuenta AS e
             WHERE e.Cerrado = @false
               AND e.FechaFin < @inFecha
         )
-        BEGIN
             THROW 50412,
                 'Quedaron estados de cuenta abiertos con fecha final vencida.',
                 1;
-        END;
 
-        ----------------------------------------------------------------
-        -- j) Confirmar fecha procesada
-        ----------------------------------------------------------------
         UPDATE dbo.ControlFechaOperacion
-        SET
-            flag_procesada = @true,
-            FechaProcesamiento = GETDATE(),
-            UltimoError = NULL
-        WHERE Fecha = @inFecha
-          AND flag_procesada = @false;
+        SET flag_procesada = @true
+            , FechaProcesamiento = GETDATE()
+            , UltimoError = NULL
+        WHERE Fecha = @inFecha;
 
-        IF @@ROWCOUNT <> 1
-        BEGIN
-            THROW 50417,
-                'No fue posible marcar la fecha como procesada.',
-                1;
-        END;
-
-        ----------------------------------------------------------------
-        -- k) Liberar candado y finalizar
-        ----------------------------------------------------------------
         EXEC sys.sp_releaseapplock
-            @Resource = 'sp_ProcesarSimulacion',
-            @LockOwner = 'Session';
+            @Resource = 'sp_ProcesarSimulacion'
+            , @LockOwner = 'Session';
 
-        SET @TieneCandado = 0;
+        SET @flag_candado = @false;
         SET @outResult = 0;
-
         RETURN 0;
     END TRY
-
     BEGIN CATCH
-        ----------------------------------------------------------------
-        -- l) Revertir la transacción activa
-        ----------------------------------------------------------------
-        IF XACT_STATE() <> 0
-        BEGIN
+        IF @@TRANCOUNT > 0
             ROLLBACK TRANSACTION;
-        END;
-
-        ----------------------------------------------------------------
-        -- m) Registrar error
-        ----------------------------------------------------------------
-        SET @Mensaje = CONCAT(
-            '[',
-            ERROR_NUMBER(),
-            '] ',
-            ERROR_MESSAGE(),
-            ' (linea ',
-            ERROR_LINE(),
-            ', ',
-            ISNULL(ERROR_PROCEDURE(), 'lote'),
-            ')'
-        );
 
         SET @outResult = ERROR_NUMBER();
+        SET @Mensaje = CONCAT(
+            '[', ERROR_NUMBER(), '] ', ERROR_MESSAGE()
+            , ' (linea ', ERROR_LINE(), ', '
+            , ISNULL(ERROR_PROCEDURE(), 'lote'), ')'
+        );
 
-        UPDATE dbo.ControlFechaOperacion
-        SET UltimoError = @Mensaje
-        WHERE Fecha = @inFecha
-          AND flag_procesada = @false;
-
-        ----------------------------------------------------------------
-        -- n) Liberar candado
-        ----------------------------------------------------------------
-        IF @TieneCandado = 1
+        IF @flag_candado = @true
         BEGIN
             EXEC sys.sp_releaseapplock
-                @Resource = 'sp_ProcesarSimulacion',
-                @LockOwner = 'Session';
+                @Resource = 'sp_ProcesarSimulacion'
+                , @LockOwner = 'Session';
 
-            SET @TieneCandado = 0;
+            UPDATE dbo.ControlFechaOperacion
+            SET UltimoError = LEFT(@Mensaje, 1024)
+            WHERE Fecha = @inFecha
+              AND flag_procesada = @false;
         END;
 
         THROW;
@@ -965,6 +776,20 @@ BEGIN
 END;
 GO
 
+
+/*
+===================================================================
+Estandar E31: ejemplo ejecutable
+===================================================================
+-- Ejecutar sin BEGIN TRAN externo. Procesa en orden ascendente todas
+-- las fechas pendientes (hasta @inFechaHasta, o todas si es NULL).
+DECLARE @outResult INT;
+EXEC dbo.sp_ProcesarSimulacion
+    @inFechaHasta = NULL,
+    @outResult = @outResult OUTPUT;
+SELECT @outResult AS Resultado;
+===================================================================
+*/
 CREATE OR ALTER PROCEDURE dbo.sp_ProcesarSimulacion
     @inFechaHasta DATE = NULL,
     @outResult INT OUTPUT
@@ -973,130 +798,72 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
+    DECLARE @true BIT = 1,
+            @false BIT = 0;
+
+    DECLARE @flag_candado BIT = 0;
+    DECLARE @Candado INT;
+    DECLARE @Fecha DATE;
+    DECLARE @ResultadoSP INT;
+
     BEGIN TRY
-        ----------------------------------------------------------------
-        -- a) Constantes
-        ----------------------------------------------------------------
-        DECLARE @true BIT = 1,
-                @false BIT = 0;
-
-        ----------------------------------------------------------------
-        -- b) Variables
-        ----------------------------------------------------------------
-        DECLARE @Fecha DATE;
-        DECLARE @ResultadoSP INT;
-        DECLARE @Candado INT;
-        DECLARE @TieneCandado BIT = 0;
-
         SET @outResult = 50000;
 
-        ----------------------------------------------------------------
-        -- c) Validar transacción externa
-        ----------------------------------------------------------------
         IF @@TRANCOUNT <> 0
-        BEGIN
-            THROW 50400,
-                'Ejecute la simulacion sin una transaccion externa.',
-                1;
-        END;
+            THROW 50400, 'Ejecute la simulacion sin una transaccion externa.', 1;
 
-        ----------------------------------------------------------------
-        -- d) Obtener candado exclusivo de sesion
-        ----------------------------------------------------------------
         EXEC @Candado = sys.sp_getapplock
-            @Resource = 'sp_ProcesarSimulacion',
-            @LockMode = 'Exclusive',
-            @LockOwner = 'Session',
-            @LockTimeout = 0;
+            @Resource = 'sp_ProcesarSimulacion'
+            , @LockMode = 'Exclusive'
+            , @LockOwner = 'Session'
+            , @LockTimeout = 0;
 
         IF @Candado < 0
-        BEGIN
-            THROW 50420,
-                'Ya hay un proceso de simulacion en ejecucion.',
-                1;
-        END;
+            THROW 50420, 'Ya hay un proceso de simulacion en ejecucion.', 1;
 
-        SET @TieneCandado = 1;
+        SET @flag_candado = @true;
 
-        ----------------------------------------------------------------
-        -- e) Procesar fechas pendientes en orden cronologico
-        ----------------------------------------------------------------
         WHILE 1 = 1
         BEGIN
             SET @Fecha = NULL;
 
-            SELECT TOP (1)
-                @Fecha = cf.Fecha
-            FROM dbo.ControlFechaOperacion AS cf
-            WHERE cf.flag_procesada = @false
-              AND (
-                    @inFechaHasta IS NULL
-                    OR cf.Fecha <= @inFechaHasta
-                  )
-            ORDER BY cf.Fecha;
+            SELECT TOP (1) @Fecha = c.Fecha
+            FROM dbo.ControlFechaOperacion AS c
+            WHERE c.flag_procesada = @false
+              AND (@inFechaHasta IS NULL OR c.Fecha <= @inFechaHasta)
+            ORDER BY c.Fecha;
 
             IF @Fecha IS NULL
                 BREAK;
 
-            SET @ResultadoSP = 50000;
-
             EXEC dbo.sp_ProcesarFechaOperacion
-                @inFecha = @Fecha,
-                @outResult = @ResultadoSP OUTPUT;
+                @inFecha = @Fecha
+                , @outResult = @ResultadoSP OUTPUT;
 
             IF @ResultadoSP <> 0
-            BEGIN
                 THROW 50421,
                     'Ocurrio un error procesando una fecha de operacion.',
                     1;
-            END;
-
-            ------------------------------------------------------------
-            -- Verificar que la fecha realmente quedo procesada
-            ------------------------------------------------------------
-            IF NOT EXISTS (
-                SELECT 1
-                FROM dbo.ControlFechaOperacion AS cf
-                WHERE cf.Fecha = @Fecha
-                  AND cf.flag_procesada = @true
-            )
-            BEGIN
-                THROW 50422,
-                    'El procedimiento de fecha finalizo sin marcarla como procesada.',
-                    1;
-            END;
         END;
 
-        ----------------------------------------------------------------
-        -- f) Liberar candado y finalizar
-        ----------------------------------------------------------------
         EXEC sys.sp_releaseapplock
-            @Resource = 'sp_ProcesarSimulacion',
-            @LockOwner = 'Session';
+            @Resource = 'sp_ProcesarSimulacion'
+            , @LockOwner = 'Session';
 
-        SET @TieneCandado = 0;
+        SET @flag_candado = @false;
         SET @outResult = 0;
-
         RETURN 0;
     END TRY
-
     BEGIN CATCH
-        ----------------------------------------------------------------
-        -- g) Registrar error
-        ----------------------------------------------------------------
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
         SET @outResult = ERROR_NUMBER();
 
-        ----------------------------------------------------------------
-        -- h) Liberar candado
-        ----------------------------------------------------------------
-        IF @TieneCandado = 1
-        BEGIN
+        IF @flag_candado = @true
             EXEC sys.sp_releaseapplock
-                @Resource = 'sp_ProcesarSimulacion',
-                @LockOwner = 'Session';
-
-            SET @TieneCandado = 0;
-        END;
+                @Resource = 'sp_ProcesarSimulacion'
+                , @LockOwner = 'Session';
 
         THROW;
     END CATCH;
